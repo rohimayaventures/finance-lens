@@ -1,46 +1,93 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
     const analysis = await req.json();
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2048,
-      system: `You are a presentation content writer. Return ONLY valid JSON, no markdown, no explanation.`,
-      messages: [{
-        role: "user",
-        content: `Create a 7-slide presentation outline from this financial analysis. Return JSON in this exact shape:
-{
-  "title": "string — company name and doc type",
-  "slides": [
-    { "headline": "string — short punchy headline max 8 words", "bullets": ["string", "string", "string"] }
-  ]
-}
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "mcp-client-2025-04-04"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: `You are a presentation generator. Use the Canva MCP tools to create a professional presentation from the financial analysis provided. 
 
-Make slide 1 a title slide, slides 2-6 cover the 5 analysis sections, slide 7 is the disclaimer.
-Keep each bullet under 12 words. Be direct, not corporate.
+Steps:
+1. Call request-outline-review with 7 slides based on the analysis
+2. Call generate-design-structured with the approved outline
+3. Call create-design-from-candidate with the first candidate
+4. Return ONLY the final Canva design URL in this exact format: {"url": "https://www.canva.com/design/..."}
 
-Analysis: ${JSON.stringify(analysis)}`
-      }]
+Do not explain anything. Just execute the steps and return the URL JSON.`,
+        messages: [
+          {
+            role: "user",
+            content: `Create a Canva presentation from this financial analysis. Use brand kit ID kAG3mB26BgM. Make it professional and data-focused.
+
+Analysis data:
+Title: ${analysis.docTitle || "Financial Analysis"}
+What they said: ${analysis.whatTheySaid}
+What it means: ${analysis.whatItMeans}
+Key numbers: ${JSON.stringify(analysis.keyNumbers)}
+Drift signals: ${JSON.stringify(analysis.driftSignals)}
+Flags: ${JSON.stringify(analysis.flags)}
+Confidence score: ${analysis.confidenceScore}%
+
+Return only the Canva URL JSON when done.`
+          }
+        ],
+        mcp_servers: [
+          {
+            type: "url",
+            url: "https://mcp.canva.com/mcp",
+            name: "canva"
+          }
+        ]
+      })
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
-    const clean = text.replace(/```json|```/g, "").trim();
-    const slideContent = JSON.parse(clean);
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("Anthropic API error:", err);
+      return NextResponse.json({ error: "Generation failed" }, { status: 500 });
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      slideContent,
-      message: "Slide content generated. Open Canva to create your deck.",
-      canvaUrl: "https://www.canva.com/create/presentations/"
-    });
+    const data = await response.json();
+    
+    // Find the URL in the response content blocks
+    let canvaUrl = "";
+    for (const block of data.content) {
+      if (block.type === "text") {
+        try {
+          const parsed = JSON.parse(block.text.replace(/```json|```/g, "").trim());
+          if (parsed.url) {
+            canvaUrl = parsed.url;
+            break;
+          }
+        } catch {
+          // Check if URL is directly in the text
+          const match = block.text.match(/https:\/\/www\.canva\.com\/design\/[a-zA-Z0-9_-]+/);
+          if (match) {
+            canvaUrl = match[0];
+            break;
+          }
+        }
+      }
+    }
+
+    if (!canvaUrl) {
+      return NextResponse.json({ error: "Could not extract Canva URL" }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: canvaUrl });
 
   } catch (error) {
     console.error("Canva route error:", error);
-    return NextResponse.json({ error: "Could not generate slide content" }, { status: 500 });
+    return NextResponse.json({ error: "Could not generate presentation" }, { status: 500 });
   }
 }

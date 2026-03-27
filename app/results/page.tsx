@@ -14,11 +14,6 @@ type Analysis = {
   flagCount: number;
 };
 
-type SlideContent = {
-  title: string;
-  slides: Array<{ headline: string; bullets: string[] }>;
-};
-
 const sectionLinks = [
   { id: "section-1", label: "What they said", color: "var(--gray-4)" },
   { id: "section-2", label: "What it actually means", color: "var(--ink)" },
@@ -37,8 +32,7 @@ export default function ResultsPage() {
   const [docType, setDocType] = useState("");
   const [preview, setPreview] = useState("");
   const [canvaLoading, setCanvaLoading] = useState(false);
-  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
-  const [slideContent, setSlideContent] = useState<SlideContent | null>(null);
+  const [isCanvaErrorOpen, setIsCanvaErrorOpen] = useState(false);
 
   useEffect(() => {
     const rawAnalysis = sessionStorage.getItem("fl_analysis");
@@ -84,21 +78,11 @@ export default function ResultsPage() {
 
       if (!response.ok) throw new Error("Canva request failed");
 
-      const payload = (await response.json()) as { slideContent?: SlideContent; success?: boolean };
-      if (!payload.slideContent) throw new Error("No slide content returned");
-      setSlideContent(payload.slideContent);
-      setIsOutlineOpen(true);
+      const payload = (await response.json()) as { url?: string };
+      if (!payload.url) throw new Error("No URL returned");
+      window.open(payload.url, "_blank", "noopener,noreferrer");
     } catch (_err) {
-      setSlideContent({
-        title: "FinanceLens AI presentation",
-        slides: [
-          {
-            headline: "Could not generate outline",
-            bullets: ["Please try again in a moment.", "If this continues, refresh and retry.", "You can still open Canva manually."],
-          },
-        ],
-      });
-      setIsOutlineOpen(true);
+      setIsCanvaErrorOpen(true);
     } finally {
       setCanvaLoading(false);
     }
@@ -333,52 +317,41 @@ export default function ResultsPage() {
         </main>
       </div>
 
-      {isOutlineOpen && slideContent ? (
+      {isCanvaErrorOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" style={{ background: "rgba(0, 0, 0, 0.72)" }}>
-          <div className="relative flex max-h-[90vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[2px] bg-white shadow-xl">
+          <div className="relative flex w-full max-w-[600px] flex-col overflow-hidden rounded-[2px] bg-white shadow-xl">
             <button
               type="button"
-              onClick={() => setIsOutlineOpen(false)}
+              onClick={() => setIsCanvaErrorOpen(false)}
               className="mono absolute right-5 top-5 z-10 text-[14px] uppercase tracking-[0.12em]"
               style={{ color: "var(--gray-5)" }}
               aria-label="Close"
             >
               ×
             </button>
-            <div className="border-b px-8 pb-5 pt-8" style={{ borderColor: "var(--gray-2)" }}>
-              <h3 className="mb-2 text-[24px] font-bold">Your presentation outline</h3>
-              <p className="mono text-[13px] leading-relaxed" style={{ color: "var(--gray-4)" }}>
-                {slideContent.title}
+            <div className="px-10 pb-8 pt-10">
+              <h3 className="mb-4 text-[24px] font-bold">Presentation generation is processing.</h3>
+              <p className="text-[16px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
+                This feature uses the Canva API and may take a moment. Please try again in a few seconds.
               </p>
             </div>
-            <div className="flex-1 overflow-y-auto px-8 py-6">
-              {slideContent.slides.map((slide, index) => (
-                <div key={`${slide.headline}-${index}`} className="mb-5 last:mb-0">
-                  <h4 className="mb-2 break-words text-[18px] font-bold leading-snug">
-                    {index + 1}. {slide.headline}
-                  </h4>
-                  <ul className="pl-5">
-                    {slide.bullets.map((bullet, bulletIndex) => (
-                      <li
-                        key={`${bullet}-${bulletIndex}`}
-                        className="mono mb-1 break-words text-[13px] leading-relaxed"
-                        style={{ color: "var(--gray-5)" }}
-                      >
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <div className="border-t p-6" style={{ borderColor: "var(--gray-2)" }}>
+            <div className="flex gap-3 border-t p-6" style={{ borderColor: "var(--gray-2)" }}>
               <button
                 type="button"
-                onClick={() => window.open("https://www.canva.com/create/presentations/", "_blank", "noopener,noreferrer")}
+                onClick={handleGenerateCanva}
                 className="mono w-full rounded-[2px] px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
                 style={{ background: "var(--ink)", color: "#fff" }}
+                disabled={canvaLoading}
               >
-                Open Canva
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCanvaErrorOpen(false)}
+                className="mono w-full rounded-[2px] border px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
+                style={{ borderColor: "var(--gray-3)", color: "var(--gray-5)", background: "#fff" }}
+              >
+                Close
               </button>
             </div>
           </div>
