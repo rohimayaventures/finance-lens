@@ -4,7 +4,11 @@ import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const TOC_NAV_OFFSET_PX = 100;
+/** Section is “current” once its top crosses this far down the viewport (handles tall sections). */
+function tocTriggerPx(): number {
+  if (typeof window === "undefined") return 132;
+  return Math.max(96, Math.min(240, window.innerHeight * 0.32));
+}
 
 type KeyNumber = { value: string; label: string; direction: string };
 type DriftSignal = { type: "hedge" | "firm"; quote: string };
@@ -68,11 +72,12 @@ export default function ResultsPage() {
     const ids = SECTIONS.map((s) => s.id);
 
     const updateActive = () => {
+      const line = tocTriggerPx();
       let current = ids[0];
       for (const id of ids) {
         const el = document.getElementById(id);
         if (!el) continue;
-        if (el.getBoundingClientRect().top <= TOC_NAV_OFFSET_PX) {
+        if (el.getBoundingClientRect().top <= line) {
           current = id;
         }
       }
@@ -88,11 +93,12 @@ export default function ResultsPage() {
       });
     };
 
-    const t = window.requestAnimationFrame(() => updateActive());
+    const initial = window.requestAnimationFrame(() => updateActive());
+
     window.addEventListener("scroll", onScrollOrResize, { passive: true });
     window.addEventListener("resize", onScrollOrResize, { passive: true });
     return () => {
-      window.cancelAnimationFrame(t);
+      window.cancelAnimationFrame(initial);
       window.removeEventListener("scroll", onScrollOrResize);
       window.removeEventListener("resize", onScrollOrResize);
       cancelAnimationFrame(raf);
@@ -109,11 +115,15 @@ export default function ResultsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(analysis),
       });
-      const data = await res.json();
-      if (data.slideContent) {
+      const data = (await res.json()) as { slideContent?: { title: string; slides: { headline: string; bullets: string[] }[] }; error?: string };
+      if (!res.ok) {
+        setOutlineError(typeof data.error === "string" ? data.error : "Could not generate briefing outline. Please try again.");
+        return;
+      }
+      if (data.slideContent?.slides?.length) {
         setOutlineModal(data.slideContent);
       } else {
-        setOutlineError("Could not generate briefing outline. Please try again.");
+        setOutlineError(typeof data.error === "string" ? data.error : "Could not generate briefing outline. Please try again.");
       }
     } catch {
       setOutlineError("Something went wrong. Please try again.");
@@ -205,6 +215,7 @@ export default function ResultsPage() {
                   href={`#${s.id}`}
                   className={isActive ? "is-active" : undefined}
                   aria-current={isActive ? "location" : undefined}
+                  onClick={() => setActiveSectionId(s.id)}
                 >
                   <span className={s.dotClass} aria-hidden />
                   {s.label}
