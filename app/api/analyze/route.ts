@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       '  "flags": [',
       '    { "text": "string — specific flag with evidence" }',
       "  ],",
-      '  "confidenceScore": number between 0 and 100,',
+      '  "confidenceScore": integer 0–100 — your estimate of how well-supported this analysis is by concrete detail in the source excerpt: richer numbers, named entities, specific claims => higher; sparse or ambiguous text => lower. Not a statistical confidence interval and not a performance prediction.',
       '  "driftCount": number,',
       '  "flagCount": number',
       "}",

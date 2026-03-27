@@ -3,6 +3,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { BriefingDeckPayload } from "@/lib/briefingTypes";
+import { downloadBriefingPptx } from "@/lib/briefingExport";
 
 /** Section is “current” once its top crosses this far down the viewport (handles tall sections). */
 function tocTriggerPx(): number {
@@ -44,8 +46,9 @@ export default function ResultsPage() {
   const [docType, setDocType] = useState("");
   const [preview, setPreview] = useState("");
   const [outlineLoading, setOutlineLoading] = useState(false);
-  const [outlineModal, setOutlineModal] = useState<{ slides: { headline: string; bullets: string[] }[]; title: string } | null>(null);
+  const [outlineModal, setOutlineModal] = useState<BriefingDeckPayload | null>(null);
   const [outlineError, setOutlineError] = useState("");
+  const [deckExporting, setDeckExporting] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState<(typeof SECTIONS)[number]["id"]>("s1");
 
   useEffect(() => {
@@ -115,7 +118,7 @@ export default function ResultsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(analysis),
       });
-      const data = (await res.json()) as { slideContent?: { title: string; slides: { headline: string; bullets: string[] }[] }; error?: string };
+      const data = (await res.json()) as { slideContent?: BriefingDeckPayload; error?: string };
       if (!res.ok) {
         setOutlineError(typeof data.error === "string" ? data.error : "Could not generate briefing outline. Please try again.");
         return;
@@ -129,6 +132,29 @@ export default function ResultsPage() {
       setOutlineError("Something went wrong. Please try again.");
     } finally {
       setOutlineLoading(false);
+    }
+  };
+
+  const BRIEFING_DECK_KEY = "fl_briefing_deck";
+
+  const openFullScreenDeck = (content: BriefingDeckPayload) => {
+    try {
+      sessionStorage.setItem(BRIEFING_DECK_KEY, JSON.stringify(content));
+      window.open("/briefing/deck", "_blank", "noopener,noreferrer");
+    } catch {
+      setOutlineError("Could not open slide view. Try allowing pop-ups for this site.");
+    }
+  };
+
+  const handleDownloadPptx = async (content: BriefingDeckPayload) => {
+    setDeckExporting(true);
+    setOutlineError("");
+    try {
+      await downloadBriefingPptx(content);
+    } catch {
+      setOutlineError("Could not build the PowerPoint file. Try again or use full-screen slides.");
+    } finally {
+      setDeckExporting(false);
     }
   };
 
@@ -170,7 +196,7 @@ export default function ResultsPage() {
             New analysis
           </Link>
           <button type="button" className="fl-app-nav-btn" onClick={openBriefingOutline} disabled={outlineLoading}>
-            {outlineLoading ? "Working…" : "Briefing outline"}
+            {outlineLoading ? "Working…" : "Briefing deck"}
           </button>
         </div>
       </header>
@@ -202,6 +228,9 @@ export default function ResultsPage() {
               <div className="fl-app-meter-fill" style={meterStyle} />
             </div>
           </div>
+          <p className="fl-app-sidebar-hint">
+            How much concrete, checkable detail is in the source text—not statistical certainty or a stock read.
+          </p>
 
           <div className="fl-app-rule" />
 
@@ -232,7 +261,7 @@ export default function ResultsPage() {
             onClick={openBriefingOutline}
             disabled={outlineLoading}
           >
-            {outlineLoading ? "Working…" : "Briefing outline →"}
+            {outlineLoading ? "Working…" : "Build briefing deck →"}
           </button>
           <button type="button" className="fl-app-sidebar-btn fl-app-sidebar-btn--ghost" disabled title="Coming soon">
             Share analysis
@@ -321,7 +350,7 @@ export default function ResultsPage() {
                 ))}
               </div>
 
-              <div className="fl-app-confidence">
+                <div className="fl-app-confidence">
                 <div className="fl-app-meter-head">
                   <span className="fl-app-meter-label">Overall confidence score</span>
                   <span className="fl-app-meter-value">{analysis.confidenceScore}%</span>
@@ -329,6 +358,10 @@ export default function ResultsPage() {
                 <div className="fl-app-meter-track">
                   <div className="fl-app-meter-fill" style={meterStyle} />
                 </div>
+                <p className="fl-app-sidebar-hint" style={{ marginTop: "12px" }}>
+                  Model estimate of how well-supported the analysis is by specifics in your excerpt (numbers, names, firm claims)—not a
+                  confidence interval or performance prediction.
+                </p>
               </div>
             </section>
 
@@ -356,7 +389,7 @@ export default function ResultsPage() {
             <button type="button" className="fl-app-modal-close" onClick={() => setOutlineModal(null)} aria-label="Close">
               ×
             </button>
-            <p className="fl-app-modal-eyebrow">Briefing outline</p>
+            <p className="fl-app-modal-eyebrow">Briefing deck</p>
             <h2 id="outline-modal-title" className="fl-app-modal-title">
               {outlineModal.title}
             </h2>
@@ -369,16 +402,39 @@ export default function ResultsPage() {
                     <li key={j}>{b}</li>
                   ))}
                 </ul>
+                {slide.imageUrl ? (
+                  <figure className="fl-app-modal-figure">
+                    <img src={slide.imageUrl} alt={slide.imageAlt ?? ""} className="fl-app-modal-slide-img" loading="lazy" />
+                    {slide.imageCaption ? <figcaption className="fl-app-modal-cap">{slide.imageCaption}</figcaption> : null}
+                  </figure>
+                ) : null}
               </div>
             ))}
-            <a
-              href="https://www.canva.com/create/presentations/"
-              target="_blank"
-              rel="noreferrer"
-              className="fl-app-modal-cta"
-            >
-              Open Canva to build →
-            </a>
+            <div className="fl-app-modal-actions">
+              <button
+                type="button"
+                className="fl-app-modal-btn"
+                disabled={deckExporting}
+                onClick={() => handleDownloadPptx(outlineModal)}
+              >
+                {deckExporting ? "Building file…" : "Download PowerPoint (.pptx)"}
+              </button>
+              <button type="button" className="fl-app-modal-btn fl-app-modal-btn--ghost" onClick={() => openFullScreenDeck(outlineModal)}>
+                Open full-screen slides
+              </button>
+              <a
+                href="https://www.canva.com/create/presentations/"
+                target="_blank"
+                rel="noreferrer"
+                className="fl-app-modal-btn fl-app-modal-btn--ghost"
+              >
+                Polish in Canva (optional)
+              </a>
+              <p className="fl-app-modal-note">
+                Slides can include images from your JSON (https URLs) or AI-generated art from each slide’s prompt (resolved on the
+                server). You get a real .pptx and full-screen view; Canva is optional for redesign.
+              </p>
+            </div>
           </div>
         </div>
       ) : null}
