@@ -1,362 +1,288 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+
+type KeyNumber = { value: string; label: string; direction: string };
+type DriftSignal = { type: "hedge" | "firm"; quote: string };
+type Flag = { text: string };
 
 type Analysis = {
   whatTheySaid: string;
   whatItMeans: string;
-  keyNumbers: Array<{ value: string; label: string; direction: string }>;
-  driftSignals: Array<{ type: "hedge" | "firm"; quote: string }>;
-  flags: Array<{ text: string }>;
+  keyNumbers: KeyNumber[];
+  driftSignals: DriftSignal[];
+  flags: Flag[];
   confidenceScore: number;
   driftCount: number;
   flagCount: number;
 };
-
-const sectionLinks = [
-  { id: "section-1", label: "What they said", color: "var(--gray-4)" },
-  { id: "section-2", label: "What it actually means", color: "var(--ink)" },
-  { id: "section-3", label: "Key numbers", color: "var(--green)" },
-  { id: "section-4", label: "Language drift", color: "var(--amber)" },
-  { id: "section-5", label: "Worth a closer look", color: "var(--red)" },
-] as const;
-
-function clampPercent(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(100, Math.max(0, value));
-}
 
 export default function ResultsPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [docType, setDocType] = useState("");
   const [preview, setPreview] = useState("");
   const [canvaLoading, setCanvaLoading] = useState(false);
-  const [isCanvaErrorOpen, setIsCanvaErrorOpen] = useState(false);
+  const [canvaModal, setCanvaModal] = useState<{ slides: { headline: string; bullets: string[] }[]; title: string } | null>(null);
+  const [canvaError, setCanvaError] = useState("");
 
   useEffect(() => {
-    const rawAnalysis = sessionStorage.getItem("fl_analysis");
-    const rawDocType = sessionStorage.getItem("fl_doctype");
-    const rawPreview = sessionStorage.getItem("fl_text_preview");
-
-    if (!rawAnalysis || !rawDocType || !rawPreview) {
-      setAnalysis(null);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(rawAnalysis) as Analysis;
-      setAnalysis(parsed);
-      setDocType(rawDocType);
-      setPreview(rawPreview);
-    } catch (_err) {
-      setAnalysis(null);
-    }
+    const a = sessionStorage.getItem("fl_analysis");
+    const d = sessionStorage.getItem("fl_doctype");
+    const p = sessionStorage.getItem("fl_text_preview");
+    if (a) setAnalysis(JSON.parse(a));
+    if (d) setDocType(d);
+    if (p) setPreview(p);
   }, []);
 
-  const safeAnalysis = useMemo(() => {
-    if (!analysis) return null;
-    return {
-      ...analysis,
-      confidenceScore: clampPercent(analysis.confidenceScore),
-      driftCount: analysis.driftCount ?? analysis.driftSignals.length,
-      flagCount: analysis.flagCount ?? analysis.flags.length,
-    };
-  }, [analysis]);
-
-  const handleGenerateCanva = async () => {
-    if (!safeAnalysis) return;
-
+  const handleCanva = async () => {
+    if (!analysis) return;
     setCanvaLoading(true);
-
+    setCanvaError("");
     try {
-      const response = await fetch("/api/canva", {
+      const res = await fetch("/api/canva", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(safeAnalysis),
+        body: JSON.stringify(analysis),
       });
-
-      if (!response.ok) throw new Error("Canva request failed");
-
-      const payload = (await response.json()) as { url?: string };
-      if (!payload.url) throw new Error("No URL returned");
-      window.open(payload.url, "_blank", "noopener,noreferrer");
-    } catch (_err) {
-      setIsCanvaErrorOpen(true);
+      const data = await res.json();
+      if (data.slideContent) {
+        setCanvaModal(data.slideContent);
+      } else {
+        setCanvaError("Could not generate slide content. Please try again.");
+      }
+    } catch {
+      setCanvaError("Something went wrong. Please try again.");
     } finally {
       setCanvaLoading(false);
     }
   };
 
-  if (!safeAnalysis) {
+  if (!analysis) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[var(--cream)] px-4 text-center">
-        <div className="max-w-md">
-          <h1 className="mb-3 text-[28px] font-bold">No analysis found</h1>
-          <p className="mb-5 text-[16px]" style={{ color: "var(--gray-5)" }}>
-            Run an analysis first, then come back to view results.
-          </p>
-          <Link
-            href="/analyze"
-            className="mono inline-flex rounded-[2px] px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
-            style={{ background: "var(--ink)", color: "#fff" }}
-          >
-            Go to Analyze
-          </Link>
+      <div style={{ background: "#FAFAF7", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontFamily: "Georgia, serif", fontSize: "22px", color: "#1C1C1E", marginBottom: "16px" }}>No analysis found</p>
+          <Link href="/analyze" style={{ fontFamily: "monospace", fontSize: "13px", color: "#C0392B", textDecoration: "underline" }}>← Start a new analysis</Link>
         </div>
       </div>
     );
   }
 
+  const docLabel = docType === "earnings" ? "Earnings call" : docType === "tenk" ? "10-K filing" : "Regulatory notice";
+
   return (
-    <div className="min-h-dvh bg-[var(--cream)] text-[var(--ink)]">
-      <nav
-        className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-black/15 px-4 sm:px-6"
-        style={{ background: "var(--ink)" }}
-      >
-        <Link href="/" className="text-2xl leading-none text-white">
-          Finance<span style={{ color: "var(--red)" }}>Lens</span>
+    <div style={{ background: "#FAFAF7", minHeight: "100vh" }}>
+
+      {/* Nav */}
+      <nav style={{ background: "#1C1C1E", height: "56px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 40px", position: "sticky", top: 0, zIndex: 100 }}>
+        <Link href="/" style={{ fontFamily: "Georgia, serif", fontSize: "20px", color: "#fff", textDecoration: "none" }}>
+          Finance<span style={{ color: "#C0392B" }}>Lens</span>
         </Link>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/analyze"
-            className="mono inline-flex rounded-[2px] border px-3 py-2 text-[14px] uppercase tracking-[0.12em]"
-            style={{ borderColor: "rgba(255,255,255,0.35)", color: "#fff" }}
-          >
-            New analysis
-          </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Link href="/analyze" style={{ fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", textDecoration: "none" }}>New analysis</Link>
           <button
-            type="button"
-            onClick={handleGenerateCanva}
-            className="mono rounded-[2px] px-3 py-2 text-[14px] uppercase tracking-[0.12em]"
-            style={{ background: "var(--red)", color: "#fff" }}
+            onClick={handleCanva}
             disabled={canvaLoading}
+            style={{ background: canvaLoading ? "#888" : "#C0392B", color: "#fff", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", padding: "9px 20px", borderRadius: "2px", border: "none", cursor: canvaLoading ? "not-allowed" : "pointer" }}
           >
-            {canvaLoading ? "Generating..." : "Generate Canva deck"}
+            {canvaLoading ? "Generating..." : "Generate deck"}
           </button>
         </div>
       </nav>
 
-      <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 md:grid-cols-[220px_1fr]">
-        <aside
-          className="hidden border-b border-r-0 md:sticky md:top-14 md:flex md:h-[calc(100dvh-56px)] md:min-w-[220px] md:flex-col md:overflow-y-auto md:border-b-0 md:border-r md:gap-6"
-          style={{ background: "var(--gray-1)", borderColor: "#E0DCD4", padding: "28px 20px" }}
-        >
-          <p className="text-[14px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
-            {preview.slice(0, 60)}...
+      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", minHeight: "calc(100vh - 56px)" }}>
+
+        {/* Sidebar */}
+        <div style={{ borderRight: "1px solid #E0DCD4", padding: "36px 24px", background: "#F4F2EE", position: "sticky", top: "56px", height: "calc(100vh - 56px)", overflowY: "auto" }}>
+
+          {/* Doc info */}
+          <p style={{ fontFamily: "Georgia, serif", fontSize: "15px", fontWeight: 700, color: "#1C1C1E", lineHeight: 1.4, marginBottom: "6px" }}>
+            {preview.slice(0, 55)}{preview.length > 55 ? "..." : ""}
           </p>
+          <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.12em" }}>{docLabel}</p>
 
-          <div className="flex flex-wrap gap-3">
-            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--ink)", color: "#fff" }}>
-              {docType}
-            </span>
-            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--red)", color: "#fff" }}>
-              Flags {safeAnalysis.flagCount}
-            </span>
-            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--amber)", color: "#fff" }}>
-              Drift {safeAnalysis.driftCount}
-            </span>
+          {/* Badges */}
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "20px" }}>
+            <span style={{ background: "#1C1C1E", color: "#fff", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "2px" }}>{docLabel}</span>
+            {analysis.flagCount > 0 && <span style={{ background: "#FEF0ED", color: "#C0392B", border: "1px solid #F5C6BC", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "2px" }}>Flags {analysis.flagCount}</span>}
+            {analysis.driftCount > 0 && <span style={{ background: "#FEF9EC", color: "#9A6B00", border: "1px solid #E8D8A0", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "2px" }}>Drift {analysis.driftCount}</span>}
           </div>
 
-          <div>
-            <p className="mono mb-3 text-[13px] uppercase tracking-[0.12em]" style={{ color: "var(--gray-5)" }}>
-              Confidence
-            </p>
-            <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: "var(--gray-3)" }}>
-              <div className="h-full" style={{ width: `${safeAnalysis.confidenceScore}%`, background: "var(--ink)" }} />
+          {/* Confidence */}
+          <div style={{ marginBottom: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", textTransform: "uppercase", letterSpacing: "0.12em" }}>Confidence</span>
+              <span style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1C1C1E" }}>{analysis.confidenceScore}%</span>
             </div>
-            <p className="mono mt-3 text-[13px] font-bold" style={{ color: "var(--ink)" }}>
-              {safeAnalysis.confidenceScore}%
-            </p>
+            <div style={{ height: "4px", background: "#E0DCD4", borderRadius: "2px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${analysis.confidenceScore}%`, background: "#1C1C1E", borderRadius: "2px" }} />
+            </div>
           </div>
 
-          <div className="h-px" style={{ background: "var(--gray-2)" }} />
+          <div style={{ height: "1px", background: "#E0DCD4", marginBottom: "20px" }} />
 
-          <div className="flex flex-col">
-            {sectionLinks.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="mono flex items-center gap-2 py-2 text-[13px]"
-                style={{ color: "var(--gray-5)" }}
-              >
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
-                {item.label}
-              </a>
-            ))}
-          </div>
+          {/* Section nav */}
+          <p style={{ fontFamily: "monospace", fontSize: "9px", color: "#BBB", textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: "12px" }}>Sections</p>
+          {[
+            { id: "s1", label: "What they said", dot: "#CCC" },
+            { id: "s2", label: "What it means", dot: "#1C1C1E" },
+            { id: "s3", label: "Key numbers", dot: "#1A7A3C" },
+            { id: "s4", label: "Language drift", dot: "#9A6B00" },
+            { id: "s5", label: "Worth a closer look", dot: "#C0392B" },
+          ].map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", fontFamily: "monospace", fontSize: "12px", color: "#666", textDecoration: "none", borderBottom: "1px solid #EAE7E0" }}
+            >
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
+              {s.label}
+            </a>
+          ))}
+
+          <div style={{ height: "1px", background: "#E0DCD4", margin: "20px 0" }} />
 
           <button
-            type="button"
-            onClick={handleGenerateCanva}
-            className="mono w-full rounded-[2px] px-3 py-3 text-[14px] uppercase tracking-[0.12em]"
-            style={{ background: "var(--red)", color: "#fff" }}
+            onClick={handleCanva}
             disabled={canvaLoading}
+            style={{ width: "100%", background: "#C0392B", color: "#fff", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px", borderRadius: "2px", border: "none", cursor: "pointer", marginBottom: "8px" }}
           >
-            {canvaLoading ? "Generating..." : "Generate Canva deck →"}
+            {canvaLoading ? "Generating..." : "Generate deck →"}
           </button>
-          <button
-            type="button"
-            className="mono w-full rounded-[2px] border px-3 py-3 text-[14px] uppercase tracking-[0.12em]"
-            style={{ borderColor: "var(--gray-3)", color: "var(--gray-5)", background: "#fff" }}
-          >
+          <button style={{ width: "100%", background: "transparent", color: "#666", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", padding: "10px", borderRadius: "2px", border: "1px solid #D5D0C8", cursor: "pointer" }}>
             Share analysis
           </button>
-        </aside>
 
-        <main className="max-h-[calc(100dvh-56px)] overflow-y-auto px-5 py-6 md:px-12 md:py-12">
-          <div className="mx-auto flex w-full max-w-[860px] flex-col pb-10">
-            <section id="section-1" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
-                <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>01</p>
-                <h2 className="text-[28px] font-bold">What they said</h2>
-              </header>
-              <div className="p-8">
-                <p className="text-[18px] leading-[1.9]" style={{ color: "#444", maxWidth: "680px" }}>{safeAnalysis.whatTheySaid}</p>
-              </div>
-            </section>
+          {canvaError && <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#C0392B", marginTop: "10px", lineHeight: 1.5 }}>{canvaError}</p>}
+        </div>
 
-            <section id="section-2" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
-                <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>02</p>
-                <h2 className="text-[28px] font-bold">What it actually means</h2>
-              </header>
-              <div className="p-8">
-                <p className="text-[18px] leading-[1.9]" style={{ color: "#444", maxWidth: "680px" }}>{safeAnalysis.whatItMeans}</p>
-              </div>
-            </section>
+        {/* Main content */}
+        <div style={{ padding: "48px", maxWidth: "860px" }}>
 
-            <section id="section-3" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
-                <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>03</p>
-                <h2 className="text-[28px] font-bold">Key numbers</h2>
-              </header>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-5 p-8">
-                {safeAnalysis.keyNumbers.map((item, idx) => {
-                  const directionLower = item.direction.toLowerCase();
-                  const isUp = directionLower.startsWith("+") || directionLower.includes("up");
-                  const directionColor = isUp ? "var(--green)" : "var(--red)";
-
-                  return (
-                    <article key={`${item.label}-${idx}`} className="rounded-[2px] border p-5" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)", minWidth: "160px" }}>
-                      <p className="mono text-[36px] font-bold leading-none" style={{ color: "var(--ink)" }}>{item.value}</p>
-                      <p className="mono mt-1 text-[13px] uppercase tracking-[0.1em]" style={{ color: "var(--gray-4)" }}>{item.label}</p>
-                      <p className="mono mt-2 text-[13px] font-bold" style={{ color: directionColor }}>{item.direction}</p>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section id="section-4" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
-                <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>04</p>
-                <h2 className="text-[28px] font-bold">Language drift</h2>
-              </header>
-              <div className="p-8">
-                {safeAnalysis.driftSignals.map((signal, idx) => {
-                  const isHedge = signal.type === "hedge";
-                  const pillStyle = isHedge
-                    ? { background: "var(--amber-light)", color: "var(--amber)", borderColor: "var(--amber-border)" }
-                    : { background: "var(--green-light)", color: "var(--green)", borderColor: "var(--green-border)" };
-
-                  return (
-                    <article key={`${signal.quote}-${idx}`} className="flex items-start gap-3 border-b py-3 last:border-b-0" style={{ borderColor: "#F4F2EE" }}>
-                      <span className="mono rounded-[99px] border px-2 py-1 text-[13px] uppercase tracking-[0.1em]" style={pillStyle}>
-                        {signal.type}
-                      </span>
-                      <p className="mono pt-2 text-[14px] leading-[1.55]" style={{ color: "var(--gray-5)" }}>{signal.quote}</p>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section id="section-5" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
-                <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>05</p>
-                <h2 className="text-[28px] font-bold">Worth a closer look</h2>
-              </header>
-              <div className="p-8">
-                {safeAnalysis.flags.map((flag, idx) => (
-                  <article
-                    key={`${flag.text}-${idx}`}
-                    className="mb-[10px] rounded-[2px] border px-[22px] py-[18px] last:mb-0"
-                    style={{
-                      borderLeftWidth: "3px",
-                      borderColor: "var(--red-border)",
-                      borderLeftColor: "var(--red)",
-                      background: "var(--red-light)",
-                    }}
-                  >
-                    <p className="mono mb-1 text-[13px] font-bold" style={{ color: "var(--red)" }}>
-                      Flag {idx + 1}
-                    </p>
-                    <p className="mono text-[14px] leading-[1.55]" style={{ color: "#5A1A1A" }}>
-                      {flag.text}
-                    </p>
-                  </article>
-                ))}
-
-                <div className="mt-2">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="mono text-[13px] uppercase tracking-[0.12em]" style={{ color: "var(--gray-5)" }}>
-                      Overall confidence
-                    </span>
-                    <span className="mono text-[13px] font-bold" style={{ color: "var(--ink)" }}>
-                      {safeAnalysis.confidenceScore}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--gray-3)" }}>
-                    <div className="h-full" style={{ width: `${safeAnalysis.confidenceScore}%`, background: "var(--ink)" }} />
-                  </div>
-                </div>
-              </div>
-            </section>
+          {/* Section 1 */}
+          <div id="s1" style={{ marginBottom: "40px" }}>
+            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
+              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>01</span>
+              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>What they said</h2>
+            </div>
+            <p style={{ fontFamily: "Georgia, serif", fontSize: "18px", color: "#444", lineHeight: 1.85 }}>{analysis.whatTheySaid}</p>
           </div>
-        </main>
+
+          {/* Section 2 */}
+          <div id="s2" style={{ marginBottom: "40px" }}>
+            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
+              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>02</span>
+              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>What it actually means</h2>
+            </div>
+            <p style={{ fontFamily: "Georgia, serif", fontSize: "18px", color: "#444", lineHeight: 1.85 }}>{analysis.whatItMeans}</p>
+          </div>
+
+          {/* Section 3 */}
+          <div id="s3" style={{ marginBottom: "40px" }}>
+            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
+              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>03</span>
+              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>Key numbers</h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
+              {analysis.keyNumbers.map((n, i) => (
+                <div key={i} style={{ background: "#fff", border: "1px solid #E0DCD4", borderRadius: "3px", padding: "24px 20px" }}>
+                  <div style={{ fontFamily: "monospace", fontSize: "36px", fontWeight: 700, color: "#1C1C1E", lineHeight: 1, marginBottom: "8px" }}>{n.value}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "6px" }}>{n.label}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: n.direction.startsWith("+") || n.direction.toLowerCase().includes("up") || n.direction.toLowerCase().includes("strong") || n.direction.toLowerCase().includes("growth") ? "#1A7A3C" : "#C0392B" }}>{n.direction}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 4 */}
+          <div id="s4" style={{ marginBottom: "40px" }}>
+            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
+              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>04</span>
+              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>Language drift</h2>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+              {analysis.driftSignals.map((d, i) => (
+                <div key={i} style={{ display: "flex", gap: "16px", alignItems: "flex-start", padding: "16px 0", borderBottom: "1px solid #F4F2EE" }}>
+                  <span style={{
+                    flexShrink: 0,
+                    fontFamily: "monospace",
+                    fontSize: "9px",
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    padding: "4px 10px",
+                    borderRadius: "2px",
+                    marginTop: "2px",
+                    background: d.type === "hedge" ? "#FEF9EC" : "#F0FBF4",
+                    color: d.type === "hedge" ? "#9A6B00" : "#1A7A3C",
+                    border: d.type === "hedge" ? "1px solid #E8D8A0" : "1px solid #A8DDB8",
+                  }}>{d.type}</span>
+                  <p style={{ fontFamily: "Georgia, serif", fontSize: "16px", color: "#555", lineHeight: 1.65, margin: 0 }}>{d.quote}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 5 */}
+          <div id="s5" style={{ marginBottom: "40px" }}>
+            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
+              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>05</span>
+              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>Worth a closer look</h2>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {analysis.flags.map((f, i) => (
+                <div key={i} style={{ background: "#FEF5F5", border: "1px solid #F5C6BC", borderLeft: "4px solid #C0392B", borderRadius: "2px", padding: "20px 24px" }}>
+                  <div style={{ fontFamily: "monospace", fontSize: "10px", fontWeight: 700, color: "#C0392B", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "8px" }}>Flag {i + 1}</div>
+                  <p style={{ fontFamily: "Georgia, serif", fontSize: "16px", color: "#5A1A1A", lineHeight: 1.7, margin: 0 }}>{f.text}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Confidence bar */}
+            <div style={{ marginTop: "32px", padding: "20px 24px", background: "#F4F2EE", border: "1px solid #E0DCD4", borderRadius: "2px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", textTransform: "uppercase", letterSpacing: "0.14em" }}>Overall confidence score</span>
+                <span style={{ fontFamily: "monospace", fontSize: "18px", fontWeight: 700, color: "#1C1C1E" }}>{analysis.confidenceScore}%</span>
+              </div>
+              <div style={{ height: "6px", background: "#E0DCD4", borderRadius: "3px", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${analysis.confidenceScore}%`, background: "#1C1C1E", borderRadius: "3px" }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Disclaimer */}
+          <div style={{ padding: "20px 24px", border: "1px solid #E0DCD4", borderRadius: "2px" }}>
+            <p style={{ fontFamily: "monospace", fontSize: "11px", color: "#BBB", lineHeight: 1.6 }}>Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output. FinanceLens AI · hannahkraulikpagade.com</p>
+          </div>
+
+        </div>
       </div>
 
-      {isCanvaErrorOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" style={{ background: "rgba(0, 0, 0, 0.72)" }}>
-          <div className="relative flex w-full max-w-[600px] flex-col overflow-hidden rounded-[2px] bg-white shadow-xl">
-            <button
-              type="button"
-              onClick={() => setIsCanvaErrorOpen(false)}
-              className="mono absolute right-5 top-5 z-10 text-[14px] uppercase tracking-[0.12em]"
-              style={{ color: "var(--gray-5)" }}
-              aria-label="Close"
-            >
-              ×
-            </button>
-            <div className="px-10 pb-8 pt-10">
-              <h3 className="mb-4 text-[24px] font-bold">Presentation generation is processing.</h3>
-              <p className="text-[16px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
-                This feature uses the Canva API and may take a moment. Please try again in a few seconds.
-              </p>
-            </div>
-            <div className="flex gap-3 border-t p-6" style={{ borderColor: "var(--gray-2)" }}>
-              <button
-                type="button"
-                onClick={handleGenerateCanva}
-                className="mono w-full rounded-[2px] px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
-                style={{ background: "var(--ink)", color: "#fff" }}
-                disabled={canvaLoading}
-              >
-                Retry
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCanvaErrorOpen(false)}
-                className="mono w-full rounded-[2px] border px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
-                style={{ borderColor: "var(--gray-3)", color: "var(--gray-5)", background: "#fff" }}
-              >
-                Close
-              </button>
-            </div>
+      {/* Canva Modal */}
+      {canvaModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+          <div style={{ background: "#fff", borderRadius: "4px", padding: "48px", maxWidth: "640px", width: "100%", maxHeight: "80vh", overflowY: "auto", position: "relative" }}>
+            <button onClick={() => setCanvaModal(null)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", fontSize: "24px", cursor: "pointer", color: "#999" }}>×</button>
+            <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#C0392B", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: "8px" }}>Your presentation outline</p>
+            <h2 style={{ fontFamily: "Georgia, serif", fontSize: "24px", fontWeight: 700, color: "#1C1C1E", marginBottom: "32px" }}>{canvaModal.title}</h2>
+            {canvaModal.slides.map((slide, i) => (
+              <div key={i} style={{ marginBottom: "24px", paddingBottom: "24px", borderBottom: "1px solid #F4F2EE" }}>
+                <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#C0392B", letterSpacing: "0.14em", marginBottom: "6px" }}>Slide {i + 1}</p>
+                <p style={{ fontFamily: "Georgia, serif", fontSize: "18px", fontWeight: 700, color: "#1C1C1E", marginBottom: "10px" }}>{slide.headline}</p>
+                <ul style={{ paddingLeft: "20px" }}>
+                  {slide.bullets.map((b, j) => (
+                    <li key={j} style={{ fontFamily: "Georgia, serif", fontSize: "15px", color: "#555", lineHeight: 1.7, marginBottom: "4px" }}>{b}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <a href="https://www.canva.com/create/presentations/" target="_blank" rel="noreferrer" style={{ display: "inline-block", background: "#C0392B", color: "#fff", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", padding: "14px 28px", borderRadius: "2px", textDecoration: "none", marginTop: "8px" }}>
+              Open Canva to build →
+            </a>
           </div>
         </div>
-      ) : null}
+      )}
+
     </div>
   );
 }
