@@ -334,28 +334,36 @@ export default function ResultsPage() {
       </div>
 
       {isOutlineOpen && slideContent ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(0, 0, 0, 0.65)" }}>
-          <div className="relative w-full max-w-[600px] rounded-[2px] bg-white p-10 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" style={{ background: "rgba(0, 0, 0, 0.72)" }}>
+          <div className="relative flex max-h-[90vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[2px] bg-white shadow-xl">
             <button
               type="button"
               onClick={() => setIsOutlineOpen(false)}
-              className="mono absolute right-4 top-4 text-[14px] uppercase tracking-[0.12em]"
+              className="mono absolute right-5 top-5 z-10 text-[14px] uppercase tracking-[0.12em]"
               style={{ color: "var(--gray-5)" }}
               aria-label="Close"
             >
               ×
             </button>
-            <h3 className="mb-2 text-[24px] font-bold">Your presentation outline</h3>
-            <p className="mono mb-6 text-[13px]" style={{ color: "var(--gray-4)" }}>
-              {slideContent.title}
-            </p>
-            <div className="max-h-[55vh] overflow-y-auto pr-1">
+            <div className="border-b px-8 pb-5 pt-8" style={{ borderColor: "var(--gray-2)" }}>
+              <h3 className="mb-2 text-[24px] font-bold">Your presentation outline</h3>
+              <p className="mono text-[13px] leading-relaxed" style={{ color: "var(--gray-4)" }}>
+                {slideContent.title}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-8 py-6">
               {slideContent.slides.map((slide, index) => (
                 <div key={`${slide.headline}-${index}`} className="mb-5 last:mb-0">
-                  <h4 className="mb-2 text-[18px] font-bold">{index + 1}. {slide.headline}</h4>
+                  <h4 className="mb-2 break-words text-[18px] font-bold leading-snug">
+                    {index + 1}. {slide.headline}
+                  </h4>
                   <ul className="pl-5">
                     {slide.bullets.map((bullet, bulletIndex) => (
-                      <li key={`${bullet}-${bulletIndex}`} className="mono mb-1 text-[13px]" style={{ color: "var(--gray-5)" }}>
+                      <li
+                        key={`${bullet}-${bulletIndex}`}
+                        className="mono mb-1 break-words text-[13px] leading-relaxed"
+                        style={{ color: "var(--gray-5)" }}
+                      >
                         {bullet}
                       </li>
                     ))}
@@ -363,14 +371,16 @@ export default function ResultsPage() {
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => window.open("https://www.canva.com/create/presentations/", "_blank", "noopener,noreferrer")}
-              className="mono mt-8 w-full rounded-[2px] px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
-              style={{ background: "var(--ink)", color: "#fff" }}
-            >
-              Open Canva
-            </button>
+            <div className="border-t p-6" style={{ borderColor: "var(--gray-2)" }}>
+              <button
+                type="button"
+                onClick={() => window.open("https://www.canva.com/create/presentations/", "_blank", "noopener,noreferrer")}
+                className="mono w-full rounded-[2px] px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
+                style={{ background: "var(--ink)", color: "#fff" }}
+              >
+                Open Canva
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
