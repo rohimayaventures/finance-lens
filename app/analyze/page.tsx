@@ -194,139 +194,99 @@ export default function AnalyzePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[var(--cream)] text-[var(--ink)]">
-      <nav
-        className="sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-black/15 px-4 sm:px-6"
-        style={{ background: "var(--ink)" }}
-      >
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="mono inline-flex items-center gap-1 text-sm tracking-[0.08em] text-white/80 transition-colors hover:text-white"
-          >
-            <span aria-hidden>←</span>
-            <span>Back</span>
+    <div className="fl-app-shell">
+      <a href="#main-content" className="fl-skip-link">
+        Skip to content
+      </a>
+      <header className="fl-app-nav">
+        <div className="fl-app-nav-start">
+          <Link href="/" className="fl-app-back">
+            ← Back
           </Link>
-          <Link href="/" className="text-2xl leading-none text-white">
-            Finance<span style={{ color: "var(--red)" }}>Lens</span>
+          <Link href="/" className="fl-app-logo">
+            Finance<span>Lens</span>
           </Link>
         </div>
-      </nav>
+        <div className="fl-app-nav-end">
+          <Link href="/compare" className="fl-app-nav-text">
+            Compare
+          </Link>
+        </div>
+      </header>
 
-      <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 lg:grid-cols-[240px_1fr]">
-        <aside className="border-b border-r-0 p-6 lg:border-b-0 lg:border-r" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
-          <p className="mono mb-3 text-[13px] uppercase tracking-[0.14em]" style={{ color: "var(--gray-4)" }}>
-            Document type
-          </p>
-          <div className="flex flex-col gap-2">
-            {DOC_TYPE_OPTIONS.map((option) => {
-              const isActive = option.value === docType;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setDocType(option.value)}
-                  className="w-full rounded-[2px] border px-3 py-3 text-left text-[14px] transition-colors"
-                  style={
-                    isActive
-                      ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" }
-                      : { background: "#fff", color: "var(--gray-5)", borderColor: "var(--gray-3)" }
-                  }
-                >
-                  {option.label}
-                </button>
-              );
-            })}
+      <div className="fl-app-layout">
+        <aside className="fl-app-sidebar">
+          <p className="fl-app-label">Document type</p>
+          <div className="fl-app-stack">
+            {DOC_TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setDocType(option.value)}
+                className={`fl-app-choice${option.value === docType ? " is-active" : ""}`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
 
-          <div className="my-5 h-px" style={{ background: "var(--gray-2)" }} />
+          <div className="fl-app-rule" />
 
-          <p className="mono mb-3 text-[13px] uppercase tracking-[0.14em]" style={{ color: "var(--gray-4)" }}>
-            Options
-          </p>
-
-          <label className="mono mb-3 flex items-center gap-2 text-[13px]" style={{ color: "var(--gray-5)" }}>
+          <p className="fl-app-label">Options</p>
+          <label className="fl-app-check">
             <input
               type="checkbox"
               checked={driftEnabled}
               onChange={(event) => setDriftEnabled(event.target.checked)}
-              className="h-4 w-4 rounded border"
             />
             Drift detection
           </label>
-          <label className="mono flex items-center gap-2 text-[13px]" style={{ color: "var(--gray-5)" }}>
+          <label className="fl-app-check fl-app-check--last">
             <input
               type="checkbox"
               checked={confidenceEnabled}
               onChange={(event) => setConfidenceEnabled(event.target.checked)}
-              className="h-4 w-4 rounded border"
             />
             Confidence scoring
           </label>
         </aside>
 
-        <main className="p-5 sm:p-8">
-          <form onSubmit={handleSubmit} className="flex max-w-4xl flex-col gap-6">
-            <p className="mono text-[13px] uppercase tracking-[0.14em]" style={{ color: "var(--gray-4)" }}>
-              Document
-            </p>
+        <main className="fl-app-main" id="main-content">
+          <form onSubmit={handleSubmit} className="fl-app-form">
+            <p className="fl-app-label fl-app-label--flush">Document</p>
 
-            <div className="flex items-end gap-6 border-b" style={{ borderColor: "var(--gray-2)" }}>
+            <div className="fl-app-tabs">
               <button
                 type="button"
                 onClick={() => setActiveTab("paste")}
-                className="mono pb-2 text-[13px] uppercase tracking-[0.12em]"
-                style={
-                  activeTab === "paste"
-                    ? { color: "var(--ink)", borderBottom: "2px solid var(--red)" }
-                    : { color: "var(--gray-4)", borderBottom: "2px solid transparent" }
-                }
+                className={`fl-app-tab${activeTab === "paste" ? " is-active" : ""}`}
               >
                 Paste text
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("upload")}
-                className="mono pb-2 text-[13px] uppercase tracking-[0.12em]"
-                style={
-                  activeTab === "upload"
-                    ? { color: "var(--ink)", borderBottom: "2px solid var(--red)" }
-                    : { color: "var(--gray-4)", borderBottom: "2px solid transparent" }
-                }
+                className={`fl-app-tab${activeTab === "upload" ? " is-active" : ""}`}
               >
                 Upload PDF
               </button>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <p className="mono text-[13px] uppercase tracking-[0.14em]" style={{ color: "var(--gray-4)" }}>
-                Try a sample document
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                {SAMPLES.map((sample) => {
-                  const isActive = activeSampleId === sample.id;
-                  return (
-                    <button
-                      key={sample.id}
-                      type="button"
-                      onClick={() => handleSampleSelect(sample.id)}
-                      className="mono rounded-[2px] border px-[14px] py-[6px] text-[13px] transition-colors"
-                      style={
-                        isActive
-                          ? { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" }
-                          : { background: "#fff", color: "var(--gray-5)", borderColor: "var(--gray-3)" }
-                      }
-                    >
-                      {sample.label}
-                    </button>
-                  );
-                })}
+            <div>
+              <p className="fl-app-label">Try a sample document</p>
+              <div className="fl-app-chip-row">
+                {SAMPLES.map((sample) => (
+                  <button
+                    key={sample.id}
+                    type="button"
+                    onClick={() => handleSampleSelect(sample.id)}
+                    className={`fl-app-chip${activeSampleId === sample.id ? " is-active" : ""}`}
+                  >
+                    {sample.label}
+                  </button>
+                ))}
               </div>
-              {loadedSample ? (
-                <p className="mono text-[13px]" style={{ color: "var(--gray-4)" }}>
-                  Loaded: {loadedSample.company}
-                </p>
-              ) : null}
+              {loadedSample ? <p className="fl-app-hint fl-app-hint-spaced">Loaded: {loadedSample.company}</p> : null}
             </div>
 
             {activeTab === "paste" ? (
@@ -337,63 +297,26 @@ export default function AnalyzePage() {
                   if (activeSampleId) setActiveSampleId(null);
                 }}
                 placeholder="Paste your earnings call transcript, 10-K filing, or regulatory notice here..."
-                className="w-full rounded-[2px] border p-4 text-[15px] leading-relaxed outline-none focus:ring-2"
-                style={{
-                  minHeight: "240px",
-                  background: "#fff",
-                  borderColor: "var(--gray-3)",
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                }}
+                className="fl-app-textarea"
               />
             ) : (
-              <div
-                className="rounded-[2px] border border-dashed p-5"
-                style={{ borderColor: "var(--gray-3)", background: "#fff" }}
-              >
-                <label className="mono mb-3 block text-[13px]" style={{ color: "var(--gray-5)" }}>
-                  Upload PDF file
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={handlePdfUpload}
-                  className="mono block w-full text-[13px]"
-                />
-                {uploadName ? (
-                  <p className="mono mt-3 text-[13px]" style={{ color: "var(--gray-5)" }}>
-                    File: {uploadName}
-                  </p>
-                ) : null}
-                {parsedCharCount !== null ? (
-                  <p className="mono mt-2 text-[13px]" style={{ color: "var(--gray-4)" }}>
-                    Parsed characters: {parsedCharCount.toLocaleString()}
-                  </p>
-                ) : null}
+              <div className="fl-app-drop">
+                <span className="fl-app-drop-label">Upload PDF file</span>
+                <input type="file" accept=".pdf,application/pdf" onChange={handlePdfUpload} className="fl-app-file" />
+                {uploadName ? <p className="fl-app-hint fl-app-hint-spaced">File: {uploadName}</p> : null}
+                {parsedCharCount !== null ? <p className="fl-app-hint">Parsed characters: {parsedCharCount.toLocaleString()}</p> : null}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isDisabled}
-              className="mono w-full rounded-[2px] px-4 py-4 text-[14px] uppercase tracking-[0.12em] transition-colors"
-              style={
-                isDisabled
-                  ? { background: "var(--gray-3)", color: "var(--gray-5)", cursor: "not-allowed" }
-                  : { background: "var(--ink)", color: "#fff" }
-              }
-            >
-              {isLoading ? "Analyzing..." : "Run analysis"}
+            <button type="submit" disabled={isDisabled} className="fl-app-submit">
+              {isLoading ? "Analyzing…" : "Run analysis"}
             </button>
 
-            <Link href="/compare" className="mono text-[13px]" style={{ color: "var(--gray-4)" }}>
+            <Link href="/compare" className="fl-app-link-quiet">
               + Compare two documents
             </Link>
 
-            {error ? (
-              <p className="mono text-[13px]" style={{ color: "var(--red)" }}>
-                {error}
-              </p>
-            ) : null}
+            {error ? <p className="fl-app-error">{error}</p> : null}
           </form>
         </main>
       </div>

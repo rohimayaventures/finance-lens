@@ -1,7 +1,10 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+
+const TOC_NAV_OFFSET_PX = 100;
 
 type KeyNumber = { value: string; label: string; direction: string };
 type DriftSignal = { type: "hedge" | "firm"; quote: string };
@@ -18,13 +21,28 @@ type Analysis = {
   flagCount: number;
 };
 
+const SECTIONS = [
+  { id: "s1", label: "What they said", dotClass: "fl-app-toc-dot fl-app-toc-dot--muted" },
+  { id: "s2", label: "What it means", dotClass: "fl-app-toc-dot fl-app-toc-dot--ink" },
+  { id: "s3", label: "Key numbers", dotClass: "fl-app-toc-dot fl-app-toc-dot--green" },
+  { id: "s4", label: "Language drift", dotClass: "fl-app-toc-dot fl-app-toc-dot--amber" },
+  { id: "s5", label: "Worth a closer look", dotClass: "fl-app-toc-dot fl-app-toc-dot--red" },
+] as const;
+
+function statTrendClass(direction: string): string {
+  const d = direction.toLowerCase();
+  const up = d.startsWith("+") || d.includes("up") || d.includes("strong") || d.includes("growth");
+  return up ? "fl-app-stat-dir fl-app-stat-dir--up" : "fl-app-stat-dir fl-app-stat-dir--down";
+}
+
 export default function ResultsPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [docType, setDocType] = useState("");
   const [preview, setPreview] = useState("");
-  const [canvaLoading, setCanvaLoading] = useState(false);
-  const [canvaModal, setCanvaModal] = useState<{ slides: { headline: string; bullets: string[] }[]; title: string } | null>(null);
-  const [canvaError, setCanvaError] = useState("");
+  const [outlineLoading, setOutlineLoading] = useState(false);
+  const [outlineModal, setOutlineModal] = useState<{ slides: { headline: string; bullets: string[] }[]; title: string } | null>(null);
+  const [outlineError, setOutlineError] = useState("");
+  const [activeSectionId, setActiveSectionId] = useState<(typeof SECTIONS)[number]["id"]>("s1");
 
   useEffect(() => {
     const a = sessionStorage.getItem("fl_analysis");
@@ -35,10 +53,56 @@ export default function ResultsPage() {
     if (p) setPreview(p);
   }, []);
 
-  const handleCanva = async () => {
+  useEffect(() => {
+    if (!outlineModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOutlineModal(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [outlineModal]);
+
+  useEffect(() => {
     if (!analysis) return;
-    setCanvaLoading(true);
-    setCanvaError("");
+
+    const ids = SECTIONS.map((s) => s.id);
+
+    const updateActive = () => {
+      let current = ids[0];
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= TOC_NAV_OFFSET_PX) {
+          current = id;
+        }
+      }
+      setActiveSectionId((prev) => (prev === current ? prev : current));
+    };
+
+    let raf = 0;
+    const onScrollOrResize = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        updateActive();
+      });
+    };
+
+    const t = window.requestAnimationFrame(() => updateActive());
+    window.addEventListener("scroll", onScrollOrResize, { passive: true });
+    window.addEventListener("resize", onScrollOrResize, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(t);
+      window.removeEventListener("scroll", onScrollOrResize);
+      window.removeEventListener("resize", onScrollOrResize);
+      cancelAnimationFrame(raf);
+    };
+  }, [analysis]);
+
+  const openBriefingOutline = async () => {
+    if (!analysis) return;
+    setOutlineLoading(true);
+    setOutlineError("");
     try {
       const res = await fetch("/api/canva", {
         method: "POST",
@@ -47,242 +111,266 @@ export default function ResultsPage() {
       });
       const data = await res.json();
       if (data.slideContent) {
-        setCanvaModal(data.slideContent);
+        setOutlineModal(data.slideContent);
       } else {
-        setCanvaError("Could not generate slide content. Please try again.");
+        setOutlineError("Could not generate briefing outline. Please try again.");
       }
     } catch {
-      setCanvaError("Something went wrong. Please try again.");
+      setOutlineError("Something went wrong. Please try again.");
     } finally {
-      setCanvaLoading(false);
+      setOutlineLoading(false);
     }
   };
 
   if (!analysis) {
     return (
-      <div style={{ background: "#FAFAF7", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <p style={{ fontFamily: "Georgia, serif", fontSize: "22px", color: "#1C1C1E", marginBottom: "16px" }}>No analysis found</p>
-          <Link href="/analyze" style={{ fontFamily: "monospace", fontSize: "13px", color: "#C0392B", textDecoration: "underline" }}>← Start a new analysis</Link>
+      <div className="fl-app-empty">
+        <a href="#fl-empty-main" className="fl-skip-link">
+          Skip to content
+        </a>
+        <div className="fl-app-empty-inner" id="fl-empty-main">
+          <p className="fl-app-empty-title">No analysis found</p>
+          <Link href="/analyze" className="fl-app-empty-link">
+            ← Start a new analysis
+          </Link>
         </div>
       </div>
     );
   }
 
   const docLabel = docType === "earnings" ? "Earnings call" : docType === "tenk" ? "10-K filing" : "Regulatory notice";
+  const meterStyle = { "--fl-meter": `${analysis.confidenceScore}%` } as CSSProperties;
 
   return (
-    <div style={{ background: "#FAFAF7", minHeight: "100vh" }}>
-
-      {/* Nav */}
-      <nav style={{ background: "#1C1C1E", height: "56px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 40px", position: "sticky", top: 0, zIndex: 100 }}>
-        <Link href="/" style={{ fontFamily: "Georgia, serif", fontSize: "20px", color: "#fff", textDecoration: "none" }}>
-          Finance<span style={{ color: "#C0392B" }}>Lens</span>
-        </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <Link href="/analyze" style={{ fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", textDecoration: "none" }}>New analysis</Link>
-          <button
-            onClick={handleCanva}
-            disabled={canvaLoading}
-            style={{ background: canvaLoading ? "#888" : "#C0392B", color: "#fff", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", padding: "9px 20px", borderRadius: "2px", border: "none", cursor: canvaLoading ? "not-allowed" : "pointer" }}
-          >
-            {canvaLoading ? "Generating..." : "Generate deck"}
+    <div className="fl-app-shell">
+      <a href="#main-content" className="fl-skip-link">
+        Skip to content
+      </a>
+      <header className="fl-app-nav">
+        <div className="fl-app-nav-start">
+          <Link href="/" className="fl-app-logo">
+            Finance<span>Lens</span>
+          </Link>
+        </div>
+        <div className="fl-app-nav-end">
+          <Link href="/compare" className="fl-app-nav-text">
+            Compare
+          </Link>
+          <Link href="/analyze" className="fl-app-nav-text">
+            New analysis
+          </Link>
+          <button type="button" className="fl-app-nav-btn" onClick={openBriefingOutline} disabled={outlineLoading}>
+            {outlineLoading ? "Working…" : "Briefing outline"}
           </button>
         </div>
-      </nav>
+      </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", minHeight: "calc(100vh - 56px)" }}>
-
-        {/* Sidebar */}
-        <div style={{ borderRight: "1px solid #E0DCD4", padding: "36px 24px", background: "#F4F2EE", position: "sticky", top: "56px", height: "calc(100vh - 56px)", overflowY: "auto" }}>
-
-          {/* Doc info */}
-          <p style={{ fontFamily: "Georgia, serif", fontSize: "15px", fontWeight: 700, color: "#1C1C1E", lineHeight: 1.4, marginBottom: "6px" }}>
-            {preview.slice(0, 55)}{preview.length > 55 ? "..." : ""}
+      <div className="fl-app-layout">
+        <aside className="fl-app-sidebar">
+          <p className="fl-app-doc-title">
+            {preview.slice(0, 55)}
+            {preview.length > 55 ? "…" : ""}
           </p>
-          <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", marginBottom: "16px", textTransform: "uppercase", letterSpacing: "0.12em" }}>{docLabel}</p>
+          <p className="fl-app-doc-meta">{docLabel}</p>
 
-          {/* Badges */}
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "20px" }}>
-            <span style={{ background: "#1C1C1E", color: "#fff", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "2px" }}>{docLabel}</span>
-            {analysis.flagCount > 0 && <span style={{ background: "#FEF0ED", color: "#C0392B", border: "1px solid #F5C6BC", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "2px" }}>Flags {analysis.flagCount}</span>}
-            {analysis.driftCount > 0 && <span style={{ background: "#FEF9EC", color: "#9A6B00", border: "1px solid #E8D8A0", fontFamily: "monospace", fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", padding: "3px 8px", borderRadius: "2px" }}>Drift {analysis.driftCount}</span>}
+          <div className="fl-app-badges">
+            <span className="fl-app-badge fl-app-badge--ink">{docLabel}</span>
+            {analysis.flagCount > 0 ? (
+              <span className="fl-app-badge fl-app-badge--flag">Flags {analysis.flagCount}</span>
+            ) : null}
+            {analysis.driftCount > 0 ? (
+              <span className="fl-app-badge fl-app-badge--drift">Drift {analysis.driftCount}</span>
+            ) : null}
           </div>
 
-          {/* Confidence */}
-          <div style={{ marginBottom: "24px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", textTransform: "uppercase", letterSpacing: "0.12em" }}>Confidence</span>
-              <span style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1C1C1E" }}>{analysis.confidenceScore}%</span>
+          <div className="fl-app-sidebar-meter">
+            <div className="fl-app-meter-head">
+              <span className="fl-app-meter-label">Confidence</span>
+              <span className="fl-app-meter-value">{analysis.confidenceScore}%</span>
             </div>
-            <div style={{ height: "4px", background: "#E0DCD4", borderRadius: "2px", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${analysis.confidenceScore}%`, background: "#1C1C1E", borderRadius: "2px" }} />
+            <div className="fl-app-meter-track">
+              <div className="fl-app-meter-fill" style={meterStyle} />
             </div>
           </div>
 
-          <div style={{ height: "1px", background: "#E0DCD4", marginBottom: "20px" }} />
+          <div className="fl-app-rule" />
 
-          {/* Section nav */}
-          <p style={{ fontFamily: "monospace", fontSize: "9px", color: "#BBB", textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: "12px" }}>Sections</p>
-          {[
-            { id: "s1", label: "What they said", dot: "#CCC" },
-            { id: "s2", label: "What it means", dot: "#1C1C1E" },
-            { id: "s3", label: "Key numbers", dot: "#1A7A3C" },
-            { id: "s4", label: "Language drift", dot: "#9A6B00" },
-            { id: "s5", label: "Worth a closer look", dot: "#C0392B" },
-          ].map((s) => (
-            <a
-              key={s.id}
-              href={`#${s.id}`}
-              style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", fontFamily: "monospace", fontSize: "12px", color: "#666", textDecoration: "none", borderBottom: "1px solid #EAE7E0" }}
-            >
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
-              {s.label}
-            </a>
-          ))}
+          <p className="fl-app-toc-label">Sections</p>
+          <nav className="fl-app-toc" aria-label="Report sections">
+            {SECTIONS.map((s) => {
+              const isActive = activeSectionId === s.id;
+              return (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  className={isActive ? "is-active" : undefined}
+                  aria-current={isActive ? "location" : undefined}
+                >
+                  <span className={s.dotClass} aria-hidden />
+                  {s.label}
+                </a>
+              );
+            })}
+          </nav>
 
-          <div style={{ height: "1px", background: "#E0DCD4", margin: "20px 0" }} />
+          <div className="fl-app-rule" />
 
           <button
-            onClick={handleCanva}
-            disabled={canvaLoading}
-            style={{ width: "100%", background: "#C0392B", color: "#fff", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", padding: "12px", borderRadius: "2px", border: "none", cursor: "pointer", marginBottom: "8px" }}
+            type="button"
+            className="fl-app-sidebar-btn fl-app-sidebar-btn--primary"
+            onClick={openBriefingOutline}
+            disabled={outlineLoading}
           >
-            {canvaLoading ? "Generating..." : "Generate deck →"}
+            {outlineLoading ? "Working…" : "Briefing outline →"}
           </button>
-          <button style={{ width: "100%", background: "transparent", color: "#666", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.12em", textTransform: "uppercase", padding: "10px", borderRadius: "2px", border: "1px solid #D5D0C8", cursor: "pointer" }}>
+          <button type="button" className="fl-app-sidebar-btn fl-app-sidebar-btn--ghost" disabled title="Coming soon">
             Share analysis
           </button>
 
-          {canvaError && <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#C0392B", marginTop: "10px", lineHeight: 1.5 }}>{canvaError}</p>}
-        </div>
+          {outlineError ? <p className="fl-app-sidebar-note">{outlineError}</p> : null}
+        </aside>
 
-        {/* Main content */}
-        <div style={{ padding: "48px", maxWidth: "860px" }}>
+        <main className="fl-app-main" id="main-content">
+          <article className="fl-app-report">
+            <header className="fl-print-header">
+              <p className="fl-print-kicker">FinanceLens AI — Analysis report</p>
+              <h1 className="fl-print-title">
+                {preview}
+                {preview.length === 120 ? "…" : ""}
+              </h1>
+              <p className="fl-print-meta">
+                {docLabel} · Model confidence {analysis.confidenceScore}% · {analysis.flagCount} flags · {analysis.driftCount}{" "}
+                drift signals
+                <span className="fl-print-meta-note"> · Assistive analysis only; not financial advice.</span>
+              </p>
+            </header>
 
-          {/* Section 1 */}
-          <div id="s1" style={{ marginBottom: "40px" }}>
-            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>01</span>
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>What they said</h2>
-            </div>
-            <p style={{ fontFamily: "Georgia, serif", fontSize: "18px", color: "#444", lineHeight: 1.85 }}>{analysis.whatTheySaid}</p>
-          </div>
-
-          {/* Section 2 */}
-          <div id="s2" style={{ marginBottom: "40px" }}>
-            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>02</span>
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>What it actually means</h2>
-            </div>
-            <p style={{ fontFamily: "Georgia, serif", fontSize: "18px", color: "#444", lineHeight: 1.85 }}>{analysis.whatItMeans}</p>
-          </div>
-
-          {/* Section 3 */}
-          <div id="s3" style={{ marginBottom: "40px" }}>
-            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>03</span>
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>Key numbers</h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px" }}>
-              {analysis.keyNumbers.map((n, i) => (
-                <div key={i} style={{ background: "#fff", border: "1px solid #E0DCD4", borderRadius: "3px", padding: "24px 20px" }}>
-                  <div style={{ fontFamily: "monospace", fontSize: "36px", fontWeight: 700, color: "#1C1C1E", lineHeight: 1, marginBottom: "8px" }}>{n.value}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "6px" }}>{n.label}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: n.direction.startsWith("+") || n.direction.toLowerCase().includes("up") || n.direction.toLowerCase().includes("strong") || n.direction.toLowerCase().includes("growth") ? "#1A7A3C" : "#C0392B" }}>{n.direction}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 4 */}
-          <div id="s4" style={{ marginBottom: "40px" }}>
-            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>04</span>
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>Language drift</h2>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-              {analysis.driftSignals.map((d, i) => (
-                <div key={i} style={{ display: "flex", gap: "16px", alignItems: "flex-start", padding: "16px 0", borderBottom: "1px solid #F4F2EE" }}>
-                  <span style={{
-                    flexShrink: 0,
-                    fontFamily: "monospace",
-                    fontSize: "9px",
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    padding: "4px 10px",
-                    borderRadius: "2px",
-                    marginTop: "2px",
-                    background: d.type === "hedge" ? "#FEF9EC" : "#F0FBF4",
-                    color: d.type === "hedge" ? "#9A6B00" : "#1A7A3C",
-                    border: d.type === "hedge" ? "1px solid #E8D8A0" : "1px solid #A8DDB8",
-                  }}>{d.type}</span>
-                  <p style={{ fontFamily: "Georgia, serif", fontSize: "16px", color: "#555", lineHeight: 1.65, margin: 0 }}>{d.quote}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Section 5 */}
-          <div id="s5" style={{ marginBottom: "40px" }}>
-            <div style={{ borderBottom: "2px solid #1C1C1E", paddingBottom: "12px", marginBottom: "24px", display: "flex", alignItems: "baseline", gap: "16px" }}>
-              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#C0392B", letterSpacing: "0.18em" }}>05</span>
-              <h2 style={{ fontFamily: "Georgia, serif", fontSize: "28px", fontWeight: 700, color: "#1C1C1E" }}>Worth a closer look</h2>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {analysis.flags.map((f, i) => (
-                <div key={i} style={{ background: "#FEF5F5", border: "1px solid #F5C6BC", borderLeft: "4px solid #C0392B", borderRadius: "2px", padding: "20px 24px" }}>
-                  <div style={{ fontFamily: "monospace", fontSize: "10px", fontWeight: 700, color: "#C0392B", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "8px" }}>Flag {i + 1}</div>
-                  <p style={{ fontFamily: "Georgia, serif", fontSize: "16px", color: "#5A1A1A", lineHeight: 1.7, margin: 0 }}>{f.text}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Confidence bar */}
-            <div style={{ marginTop: "32px", padding: "20px 24px", background: "#F4F2EE", border: "1px solid #E0DCD4", borderRadius: "2px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#999", textTransform: "uppercase", letterSpacing: "0.14em" }}>Overall confidence score</span>
-                <span style={{ fontFamily: "monospace", fontSize: "18px", fontWeight: 700, color: "#1C1C1E" }}>{analysis.confidenceScore}%</span>
+            <section id="s1" className="fl-app-report-section">
+              <div className="fl-app-section-head">
+                <span className="fl-app-section-num">01</span>
+                <h2 className="fl-app-section-title">What they said</h2>
               </div>
-              <div style={{ height: "6px", background: "#E0DCD4", borderRadius: "3px", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${analysis.confidenceScore}%`, background: "#1C1C1E", borderRadius: "3px" }} />
+              <p className="fl-app-prose">{analysis.whatTheySaid}</p>
+            </section>
+
+            <section id="s2" className="fl-app-report-section">
+              <div className="fl-app-section-head">
+                <span className="fl-app-section-num">02</span>
+                <h2 className="fl-app-section-title">What it actually means</h2>
               </div>
+              <p className="fl-app-prose">{analysis.whatItMeans}</p>
+            </section>
+
+            <section id="s3" className="fl-app-report-section">
+              <div className="fl-app-section-head">
+                <span className="fl-app-section-num">03</span>
+                <h2 className="fl-app-section-title">Key numbers</h2>
+              </div>
+              <div className="fl-app-stat-grid">
+                {analysis.keyNumbers.map((n, i) => (
+                  <div key={i} className="fl-app-stat-card">
+                    <div className="fl-app-stat-value">{n.value}</div>
+                    <div className="fl-app-stat-label">{n.label}</div>
+                    <div className={statTrendClass(n.direction)}>{n.direction}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section id="s4" className="fl-app-report-section">
+              <div className="fl-app-section-head">
+                <span className="fl-app-section-num">04</span>
+                <h2 className="fl-app-section-title">Language drift</h2>
+              </div>
+              <div className="fl-app-drift-list">
+                {analysis.driftSignals.map((d, i) => (
+                  <div key={i} className="fl-app-drift-row">
+                    <span
+                      className={`fl-app-drift-tag ${d.type === "hedge" ? "fl-app-drift-tag--hedge" : "fl-app-drift-tag--firm"}`}
+                    >
+                      {d.type}
+                    </span>
+                    <p className="fl-app-drift-quote">{d.quote}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section id="s5" className="fl-app-report-section">
+              <div className="fl-app-section-head">
+                <span className="fl-app-section-num">05</span>
+                <h2 className="fl-app-section-title">Worth a closer look</h2>
+              </div>
+              <div className="fl-app-flags">
+                {analysis.flags.map((f, i) => (
+                  <div key={i} className="fl-app-flag">
+                    <div className="fl-app-flag-label">Flag {i + 1}</div>
+                    <p className="fl-app-flag-text">{f.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="fl-app-confidence">
+                <div className="fl-app-meter-head">
+                  <span className="fl-app-meter-label">Overall confidence score</span>
+                  <span className="fl-app-meter-value">{analysis.confidenceScore}%</span>
+                </div>
+                <div className="fl-app-meter-track">
+                  <div className="fl-app-meter-fill" style={meterStyle} />
+                </div>
+              </div>
+            </section>
+
+            <div className="fl-app-disclaimer">
+              <p>
+                Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output.
+                FinanceLens AI · hannahkraulikpagade.com
+              </p>
             </div>
-          </div>
-
-          {/* Disclaimer */}
-          <div style={{ padding: "20px 24px", border: "1px solid #E0DCD4", borderRadius: "2px" }}>
-            <p style={{ fontFamily: "monospace", fontSize: "11px", color: "#BBB", lineHeight: 1.6 }}>Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output. FinanceLens AI · hannahkraulikpagade.com</p>
-          </div>
-
-        </div>
+          </article>
+        </main>
       </div>
 
-      {/* Canva Modal */}
-      {canvaModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
-          <div style={{ background: "#fff", borderRadius: "4px", padding: "48px", maxWidth: "640px", width: "100%", maxHeight: "80vh", overflowY: "auto", position: "relative" }}>
-            <button onClick={() => setCanvaModal(null)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", fontSize: "24px", cursor: "pointer", color: "#999" }}>×</button>
-            <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#C0392B", letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: "8px" }}>Your presentation outline</p>
-            <h2 style={{ fontFamily: "Georgia, serif", fontSize: "24px", fontWeight: 700, color: "#1C1C1E", marginBottom: "32px" }}>{canvaModal.title}</h2>
-            {canvaModal.slides.map((slide, i) => (
-              <div key={i} style={{ marginBottom: "24px", paddingBottom: "24px", borderBottom: "1px solid #F4F2EE" }}>
-                <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#C0392B", letterSpacing: "0.14em", marginBottom: "6px" }}>Slide {i + 1}</p>
-                <p style={{ fontFamily: "Georgia, serif", fontSize: "18px", fontWeight: 700, color: "#1C1C1E", marginBottom: "10px" }}>{slide.headline}</p>
-                <ul style={{ paddingLeft: "20px" }}>
+      {outlineModal ? (
+        <div
+          className="fl-app-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="outline-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOutlineModal(null);
+          }}
+        >
+          <div className="fl-app-modal">
+            <button type="button" className="fl-app-modal-close" onClick={() => setOutlineModal(null)} aria-label="Close">
+              ×
+            </button>
+            <p className="fl-app-modal-eyebrow">Briefing outline</p>
+            <h2 id="outline-modal-title" className="fl-app-modal-title">
+              {outlineModal.title}
+            </h2>
+            {outlineModal.slides.map((slide, i) => (
+              <div key={i} className="fl-app-modal-block">
+                <p className="fl-app-modal-slide-num">Slide {i + 1}</p>
+                <p className="fl-app-modal-slide-hed">{slide.headline}</p>
+                <ul className="fl-app-modal-list">
                   {slide.bullets.map((b, j) => (
-                    <li key={j} style={{ fontFamily: "Georgia, serif", fontSize: "15px", color: "#555", lineHeight: 1.7, marginBottom: "4px" }}>{b}</li>
+                    <li key={j}>{b}</li>
                   ))}
                 </ul>
               </div>
             ))}
-            <a href="https://www.canva.com/create/presentations/" target="_blank" rel="noreferrer" style={{ display: "inline-block", background: "#C0392B", color: "#fff", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", padding: "14px 28px", borderRadius: "2px", textDecoration: "none", marginTop: "8px" }}>
+            <a
+              href="https://www.canva.com/create/presentations/"
+              target="_blank"
+              rel="noreferrer"
+              className="fl-app-modal-cta"
+            >
               Open Canva to build →
             </a>
           </div>
         </div>
-      )}
-
+      ) : null}
     </div>
   );
 }
