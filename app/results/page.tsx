@@ -138,47 +138,47 @@ export default function ResultsPage() {
         </div>
       </nav>
 
-      <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 lg:grid-cols-[240px_1fr]">
+      <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 md:grid-cols-[240px_1fr]">
         <aside
-          className="border-b border-r-0 p-6 lg:sticky lg:top-14 lg:h-[calc(100dvh-56px)] lg:overflow-y-auto lg:border-b-0 lg:border-r"
+          className="hidden border-b border-r-0 p-6 md:sticky md:top-14 md:flex md:h-[calc(100dvh-56px)] md:flex-col md:overflow-y-auto md:border-b-0 md:border-r md:gap-6"
           style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}
         >
-          <p className="mb-3 text-[14px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
+          <p className="text-[16px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
             {preview.slice(0, 60)}...
           </p>
 
-          <div className="mb-4 flex flex-wrap gap-2">
-            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--ink)", color: "#fff" }}>
+          <div className="flex flex-wrap gap-3">
+            <span className="mono rounded-[2px] px-2 py-1 text-[14px]" style={{ background: "var(--ink)", color: "#fff" }}>
               {docType}
             </span>
-            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--red)", color: "#fff" }}>
+            <span className="mono rounded-[2px] px-2 py-1 text-[14px]" style={{ background: "var(--red)", color: "#fff" }}>
               Flags {safeAnalysis.flagCount}
             </span>
-            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--amber)", color: "#fff" }}>
+            <span className="mono rounded-[2px] px-2 py-1 text-[14px]" style={{ background: "var(--amber)", color: "#fff" }}>
               Drift {safeAnalysis.driftCount}
             </span>
           </div>
 
-          <div className="mb-5">
-            <p className="mono mb-2 text-[13px] uppercase tracking-[0.12em]" style={{ color: "var(--gray-5)" }}>
+          <div>
+            <p className="mono mb-3 text-[14px] uppercase tracking-[0.12em]" style={{ color: "var(--gray-5)" }}>
               Confidence
             </p>
             <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: "var(--gray-3)" }}>
               <div className="h-full" style={{ width: `${safeAnalysis.confidenceScore}%`, background: "var(--ink)" }} />
             </div>
-            <p className="mono mt-2 text-[13px] font-bold" style={{ color: "var(--ink)" }}>
+            <p className="mono mt-3 text-[14px] font-bold" style={{ color: "var(--ink)" }}>
               {safeAnalysis.confidenceScore}%
             </p>
           </div>
 
-          <div className="my-5 h-px" style={{ background: "var(--gray-2)" }} />
+          <div className="h-px" style={{ background: "var(--gray-2)" }} />
 
-          <div className="mb-5 flex flex-col gap-2">
+          <div className="flex flex-col">
             {sectionLinks.map((item) => (
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="mono flex items-center gap-2 text-[13px]"
+                className="mono flex items-center gap-2 py-2 text-[14px]"
                 style={{ color: "var(--gray-5)" }}
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
@@ -190,7 +190,7 @@ export default function ResultsPage() {
           <button
             type="button"
             onClick={handleGenerateCanva}
-            className="mono mb-2 w-full rounded-[2px] px-3 py-3 text-[14px] uppercase tracking-[0.12em]"
+            className="mono w-full rounded-[2px] px-3 py-3 text-[14px] uppercase tracking-[0.12em]"
             style={{ background: "var(--red)", color: "#fff" }}
             disabled={canvaLoading}
           >
@@ -204,40 +204,40 @@ export default function ResultsPage() {
             Share analysis
           </button>
           {canvaError ? (
-            <p className="mono mt-3 text-[13px]" style={{ color: "var(--red)" }}>
+            <p className="mono text-[14px]" style={{ color: "var(--red)" }}>
               {canvaError}
             </p>
           ) : null}
         </aside>
 
-        <main className="max-h-[calc(100dvh-56px)] overflow-y-auto p-5 sm:p-8">
-          <div className="mx-auto flex w-full max-w-[800px] flex-col gap-4 pb-10">
-            <section id="section-1" className="overflow-hidden rounded-[2px] border" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+        <main className="max-h-[calc(100dvh-56px)] overflow-y-auto px-5 py-6 md:px-12 md:py-10">
+          <div className="mx-auto flex w-full max-w-[800px] flex-col pb-10">
+            <section id="section-1" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
               <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>01</p>
-                <h2 className="text-[20px] font-bold">What they said</h2>
+                <h2 className="text-[26px] font-bold">What they said</h2>
               </header>
-              <div className="px-5 py-5">
-                <p className="text-[16px] leading-[1.7]" style={{ color: "var(--gray-5)" }}>{safeAnalysis.whatTheySaid}</p>
+              <div className="px-8 py-7">
+                <p className="text-[17px] leading-[1.8]" style={{ color: "var(--gray-5)" }}>{safeAnalysis.whatTheySaid}</p>
               </div>
             </section>
 
-            <section id="section-2" className="overflow-hidden rounded-[2px] border" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+            <section id="section-2" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
               <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>02</p>
-                <h2 className="text-[20px] font-bold">What it actually means</h2>
+                <h2 className="text-[26px] font-bold">What it actually means</h2>
               </header>
-              <div className="px-5 py-5">
-                <p className="text-[16px] leading-[1.7]" style={{ color: "var(--gray-5)" }}>{safeAnalysis.whatItMeans}</p>
+              <div className="px-8 py-7">
+                <p className="text-[17px] leading-[1.8]" style={{ color: "var(--gray-5)" }}>{safeAnalysis.whatItMeans}</p>
               </div>
             </section>
 
-            <section id="section-3" className="overflow-hidden rounded-[2px] border" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+            <section id="section-3" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
               <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>03</p>
-                <h2 className="text-[20px] font-bold">Key numbers</h2>
+                <h2 className="text-[26px] font-bold">Key numbers</h2>
               </header>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3 px-5 py-5">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-5 px-8 py-7">
                 {safeAnalysis.keyNumbers.map((item, idx) => {
                   const directionLower = item.direction.toLowerCase();
                   const isUp = directionLower.startsWith("+") || directionLower.includes("up");
@@ -245,7 +245,7 @@ export default function ResultsPage() {
 
                   return (
                     <article key={`${item.label}-${idx}`} className="rounded-[2px] border p-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
-                      <p className="mono text-[24px] font-bold leading-none" style={{ color: "var(--ink)" }}>{item.value}</p>
+                      <p className="mono text-[32px] font-bold leading-none" style={{ color: "var(--ink)" }}>{item.value}</p>
                       <p className="mono mt-1 text-[13px] uppercase tracking-[0.1em]" style={{ color: "var(--gray-4)" }}>{item.label}</p>
                       <p className="mono mt-2 text-[13px] font-bold" style={{ color: directionColor }}>{item.direction}</p>
                     </article>
@@ -254,12 +254,12 @@ export default function ResultsPage() {
               </div>
             </section>
 
-            <section id="section-4" className="overflow-hidden rounded-[2px] border" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+            <section id="section-4" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
               <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>04</p>
-                <h2 className="text-[20px] font-bold">Language drift</h2>
+                <h2 className="text-[26px] font-bold">Language drift</h2>
               </header>
-              <div className="flex flex-col gap-3 px-5 py-5">
+              <div className="flex flex-col gap-3 px-8 py-7">
                 {safeAnalysis.driftSignals.map((signal, idx) => {
                   const isHedge = signal.type === "hedge";
                   const pillStyle = isHedge
@@ -271,23 +271,23 @@ export default function ResultsPage() {
                       <span className="mono rounded-[99px] border px-2 py-1 text-[13px] uppercase tracking-[0.1em]" style={pillStyle}>
                         {signal.type}
                       </span>
-                      <p className="mono text-[13px] leading-[1.55]" style={{ color: "var(--gray-5)" }}>{signal.quote}</p>
+                      <p className="mono pt-2 text-[14px] leading-[1.55]" style={{ color: "var(--gray-5)" }}>{signal.quote}</p>
                     </article>
                   );
                 })}
               </div>
             </section>
 
-            <section id="section-5" className="overflow-hidden rounded-[2px] border" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+            <section id="section-5" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
               <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>05</p>
-                <h2 className="text-[20px] font-bold">Worth a closer look</h2>
+                <h2 className="text-[26px] font-bold">Worth a closer look</h2>
               </header>
-              <div className="flex flex-col gap-3 px-5 py-5">
+              <div className="flex flex-col gap-3 px-8 py-7">
                 {safeAnalysis.flags.map((flag, idx) => (
                   <article
                     key={`${flag.text}-${idx}`}
-                    className="rounded-[2px] border px-4 py-3"
+                    className="rounded-[2px] border px-5 py-4"
                     style={{
                       borderLeftWidth: "3px",
                       borderColor: "var(--red-border)",
@@ -298,7 +298,7 @@ export default function ResultsPage() {
                     <p className="mono mb-1 text-[13px] font-bold" style={{ color: "var(--red)" }}>
                       Flag {idx + 1}
                     </p>
-                    <p className="mono text-[13px] leading-[1.55]" style={{ color: "#5A1A1A" }}>
+                    <p className="mono text-[14px] leading-[1.55]" style={{ color: "#5A1A1A" }}>
                       {flag.text}
                     </p>
                   </article>
