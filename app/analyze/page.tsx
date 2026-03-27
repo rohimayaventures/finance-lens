@@ -211,6 +211,9 @@ export default function AnalyzePage() {
           <Link href="/compare" className="fl-app-nav-text">
             Compare
           </Link>
+          <Link href="/methodology" className="fl-app-nav-text">
+            Methodology
+          </Link>
         </div>
       </header>
 

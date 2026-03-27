@@ -258,6 +258,10 @@ export default function Home() {
         <footer className="fl-lp-footer">
           <span className="fl-lp-footer-left">FinanceLens AI · hannahkraulikpagade.com</span>
           <span className="fl-lp-footer-disc">
+            <Link href="/methodology">Methodology</Link>
+            <span aria-hidden className="fl-lp-footer-sep">
+              {" · "}
+            </span>
             Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output.
           </span>
         </footer>

@@ -9,6 +9,8 @@ export type BriefingSlide = {
   imageUrl?: string;
   imageAlt?: string;
   imageCaption?: string;
+  /** Required for Unsplash photos (API guidelines). */
+  imageAttribution?: string;
 };
 
 export type BriefingDeckPayload = {

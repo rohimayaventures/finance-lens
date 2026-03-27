@@ -2801,6 +2801,140 @@ header[id] {
   margin: 0;
 }
 
+.fl-deck-slide-attrib {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: rgba(240, 236, 228, 0.45);
+  margin: 0;
+}
+
+.fl-app-evidence-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fl-app-evidence-item {
+  margin: 0;
+  padding: 0;
+}
+
+.fl-app-evidence-quote {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--ink);
+  background: rgba(255, 255, 255, 0.65);
+  font-family: Georgia, serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.fl-app-evidence-ctx {
+  margin: 8px 0 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--gray-5);
+}
+
+.fl-app-modal-attrib {
+  margin: 6px 0 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--gray-5);
+}
+
+.fl-app-code-inline {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  padding: 2px 5px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 3px;
+}
+
+.fl-methodology-main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+.fl-methodology-article {
+  color: var(--ink);
+}
+
+.fl-methodology-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gray-5);
+  margin: 0 0 12px;
+}
+
+.fl-methodology-title {
+  font-family: Georgia, serif;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 600;
+  margin: 0 0 16px;
+  line-height: 1.2;
+}
+
+.fl-methodology-lede {
+  font-family: Georgia, serif;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--gray-5);
+  margin: 0 0 36px;
+}
+
+.fl-methodology-section {
+  margin-bottom: 28px;
+}
+
+.fl-methodology-section h2 {
+  font-family: Georgia, serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 10px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 8px;
+}
+
+.fl-methodology-section p {
+  font-family: Georgia, serif;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--gray-5);
+  margin: 0;
+}
+
+.fl-methodology-footer {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-3);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+}
+
+.fl-methodology-cta {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--red);
+}
+
+.fl-methodology-cta:hover {
+  color: var(--red);
+}
+
+.fl-methodology-sep {
+  margin: 0 10px;
+  color: var(--gray-3);
+}
+
 .fl-app-modal-figure {
   margin: 14px 0 0;
 }

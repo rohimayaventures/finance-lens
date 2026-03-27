@@ -286,6 +286,9 @@ export default function ComparePage() {
           </Link>
         </div>
         <div className="fl-app-nav-end">
+          <Link href="/methodology" className="fl-app-nav-text">
+            Methodology
+          </Link>
           <Link href="/analyze" className="fl-app-nav-text">
             Single document
           </Link>

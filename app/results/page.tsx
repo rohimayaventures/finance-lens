@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BriefingDeckPayload } from "@/lib/briefingTypes";
 import { downloadBriefingPptx } from "@/lib/briefingExport";
@@ -16,18 +16,23 @@ type KeyNumber = { value: string; label: string; direction: string };
 type DriftSignal = { type: "hedge" | "firm"; quote: string };
 type Flag = { text: string };
 
+type SupportingEvidence = { quote: string; context?: string };
+
 type Analysis = {
   whatTheySaid: string;
   whatItMeans: string;
   keyNumbers: KeyNumber[];
   driftSignals: DriftSignal[];
   flags: Flag[];
-  confidenceScore: number;
+  supportingEvidence?: SupportingEvidence[];
+  confidenceScore: number | null;
   driftCount: number;
   flagCount: number;
 };
 
-const SECTIONS = [
+type TocSection = { id: string; label: string; dotClass: string };
+
+const SECTION_BASE: readonly TocSection[] = [
   { id: "s1", label: "What they said", dotClass: "fl-app-toc-dot fl-app-toc-dot--muted" },
   { id: "s2", label: "What it means", dotClass: "fl-app-toc-dot fl-app-toc-dot--ink" },
   { id: "s3", label: "Key numbers", dotClass: "fl-app-toc-dot fl-app-toc-dot--green" },
@@ -49,13 +54,39 @@ export default function ResultsPage() {
   const [outlineModal, setOutlineModal] = useState<BriefingDeckPayload | null>(null);
   const [outlineError, setOutlineError] = useState("");
   const [deckExporting, setDeckExporting] = useState(false);
-  const [activeSectionId, setActiveSectionId] = useState<(typeof SECTIONS)[number]["id"]>("s1");
+  const [activeSectionId, setActiveSectionId] = useState<string>("s1");
+
+  const tocSections = useMemo((): TocSection[] => {
+    if (!analysis) return [...SECTION_BASE];
+    const ev = analysis.supportingEvidence?.length ?? 0;
+    if (ev > 0) {
+      return [
+        SECTION_BASE[0],
+        { id: "s1e", label: "Source anchors", dotClass: "fl-app-toc-dot fl-app-toc-dot--ink" },
+        ...SECTION_BASE.slice(1),
+      ];
+    }
+    return [...SECTION_BASE];
+  }, [analysis]);
 
   useEffect(() => {
     const a = sessionStorage.getItem("fl_analysis");
     const d = sessionStorage.getItem("fl_doctype");
     const p = sessionStorage.getItem("fl_text_preview");
-    if (a) setAnalysis(JSON.parse(a));
+    if (a) {
+      const raw = JSON.parse(a) as Partial<Analysis>;
+      setAnalysis({
+        whatTheySaid: raw.whatTheySaid ?? "",
+        whatItMeans: raw.whatItMeans ?? "",
+        keyNumbers: raw.keyNumbers ?? [],
+        driftSignals: raw.driftSignals ?? [],
+        flags: raw.flags ?? [],
+        supportingEvidence: raw.supportingEvidence,
+        confidenceScore: raw.confidenceScore ?? null,
+        driftCount: raw.driftCount ?? raw.driftSignals?.length ?? 0,
+        flagCount: raw.flagCount ?? raw.flags?.length ?? 0,
+      });
+    }
     if (d) setDocType(d);
     if (p) setPreview(p);
   }, []);
@@ -72,7 +103,7 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!analysis) return;
 
-    const ids = SECTIONS.map((s) => s.id);
+    const ids = tocSections.map((s) => s.id);
 
     const updateActive = () => {
       const line = tocTriggerPx();
@@ -106,7 +137,7 @@ export default function ResultsPage() {
       window.removeEventListener("resize", onScrollOrResize);
       cancelAnimationFrame(raf);
     };
-  }, [analysis]);
+  }, [analysis, tocSections]);
 
   const openBriefingOutline = async () => {
     if (!analysis) return;
@@ -175,7 +206,14 @@ export default function ResultsPage() {
   }
 
   const docLabel = docType === "earnings" ? "Earnings call" : docType === "tenk" ? "10-K filing" : "Regulatory notice";
-  const meterStyle = { "--fl-meter": `${analysis.confidenceScore}%` } as CSSProperties;
+  const confPct = analysis.confidenceScore;
+  const meterStyle = { "--fl-meter": `${confPct ?? 0}%` } as CSSProperties;
+  const hasEvidence = (analysis.supportingEvidence?.length ?? 0) > 0;
+  const n = (id: string) => {
+    const order = hasEvidence ? ["s1", "s1e", "s2", "s3", "s4", "s5"] : ["s1", "s2", "s3", "s4", "s5"];
+    const i = order.indexOf(id);
+    return i >= 0 ? String(i + 1).padStart(2, "0") : "—";
+  };
 
   return (
     <div className="fl-app-shell">
@@ -191,6 +229,9 @@ export default function ResultsPage() {
         <div className="fl-app-nav-end">
           <Link href="/compare" className="fl-app-nav-text">
             Compare
+          </Link>
+          <Link href="/methodology" className="fl-app-nav-text">
+            Methodology
           </Link>
           <Link href="/analyze" className="fl-app-nav-text">
             New analysis
@@ -222,7 +263,7 @@ export default function ResultsPage() {
           <div className="fl-app-sidebar-meter">
             <div className="fl-app-meter-head">
               <span className="fl-app-meter-label">Confidence</span>
-              <span className="fl-app-meter-value">{analysis.confidenceScore}%</span>
+              <span className="fl-app-meter-value">{confPct != null ? `${confPct}%` : "—"}</span>
             </div>
             <div className="fl-app-meter-track">
               <div className="fl-app-meter-fill" style={meterStyle} />
@@ -236,7 +277,7 @@ export default function ResultsPage() {
 
           <p className="fl-app-toc-label">Sections</p>
           <nav className="fl-app-toc" aria-label="Report sections">
-            {SECTIONS.map((s) => {
+            {tocSections.map((s) => {
               const isActive = activeSectionId === s.id;
               return (
                 <a
@@ -279,23 +320,44 @@ export default function ResultsPage() {
                 {preview.length === 120 ? "…" : ""}
               </h1>
               <p className="fl-print-meta">
-                {docLabel} · Model confidence {analysis.confidenceScore}% · {analysis.flagCount} flags · {analysis.driftCount}{" "}
-                drift signals
+                {docLabel} · Model confidence {confPct != null ? `${confPct}%` : "off"} · {analysis.flagCount} flags ·{" "}
+                {analysis.driftCount} drift signals
                 <span className="fl-print-meta-note"> · Assistive analysis only; not financial advice.</span>
               </p>
             </header>
 
             <section id="s1" className="fl-app-report-section">
               <div className="fl-app-section-head">
-                <span className="fl-app-section-num">01</span>
+                <span className="fl-app-section-num">{n("s1")}</span>
                 <h2 className="fl-app-section-title">What they said</h2>
               </div>
               <p className="fl-app-prose">{analysis.whatTheySaid}</p>
             </section>
 
+            {hasEvidence ? (
+              <section id="s1e" className="fl-app-report-section">
+                <div className="fl-app-section-head">
+                  <span className="fl-app-section-num">{n("s1e")}</span>
+                  <h2 className="fl-app-section-title">Source anchors</h2>
+                </div>
+                <p className="fl-app-prose fl-app-hint-spaced">
+                  Short excerpts from your paste that support the analysis. Always cross-check against the original filing or
+                  transcript.
+                </p>
+                <ul className="fl-app-evidence-list">
+                  {analysis.supportingEvidence!.map((e, i) => (
+                    <li key={i} className="fl-app-evidence-item">
+                      <blockquote className="fl-app-evidence-quote">{e.quote}</blockquote>
+                      {e.context ? <p className="fl-app-evidence-ctx">{e.context}</p> : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             <section id="s2" className="fl-app-report-section">
               <div className="fl-app-section-head">
-                <span className="fl-app-section-num">02</span>
+                <span className="fl-app-section-num">{n("s2")}</span>
                 <h2 className="fl-app-section-title">What it actually means</h2>
               </div>
               <p className="fl-app-prose">{analysis.whatItMeans}</p>
@@ -303,7 +365,7 @@ export default function ResultsPage() {
 
             <section id="s3" className="fl-app-report-section">
               <div className="fl-app-section-head">
-                <span className="fl-app-section-num">03</span>
+                <span className="fl-app-section-num">{n("s3")}</span>
                 <h2 className="fl-app-section-title">Key numbers</h2>
               </div>
               <div className="fl-app-stat-grid">
@@ -319,7 +381,7 @@ export default function ResultsPage() {
 
             <section id="s4" className="fl-app-report-section">
               <div className="fl-app-section-head">
-                <span className="fl-app-section-num">04</span>
+                <span className="fl-app-section-num">{n("s4")}</span>
                 <h2 className="fl-app-section-title">Language drift</h2>
               </div>
               <div className="fl-app-drift-list">
@@ -338,7 +400,7 @@ export default function ResultsPage() {
 
             <section id="s5" className="fl-app-report-section">
               <div className="fl-app-section-head">
-                <span className="fl-app-section-num">05</span>
+                <span className="fl-app-section-num">{n("s5")}</span>
                 <h2 className="fl-app-section-title">Worth a closer look</h2>
               </div>
               <div className="fl-app-flags">
@@ -353,7 +415,7 @@ export default function ResultsPage() {
                 <div className="fl-app-confidence">
                 <div className="fl-app-meter-head">
                   <span className="fl-app-meter-label">Overall confidence score</span>
-                  <span className="fl-app-meter-value">{analysis.confidenceScore}%</span>
+                  <span className="fl-app-meter-value">{confPct != null ? `${confPct}%` : "—"}</span>
                 </div>
                 <div className="fl-app-meter-track">
                   <div className="fl-app-meter-fill" style={meterStyle} />
@@ -367,7 +429,9 @@ export default function ResultsPage() {
 
             <div className="fl-app-disclaimer">
               <p>
-                Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output.
+                Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output.{" "}
+                <Link href="/methodology">How FinanceLens works</Link>
+                <br />
                 FinanceLens AI · hannahkraulikpagade.com
               </p>
             </div>
@@ -406,6 +470,9 @@ export default function ResultsPage() {
                   <figure className="fl-app-modal-figure">
                     <img src={slide.imageUrl} alt={slide.imageAlt ?? ""} className="fl-app-modal-slide-img" loading="lazy" />
                     {slide.imageCaption ? <figcaption className="fl-app-modal-cap">{slide.imageCaption}</figcaption> : null}
+                    {slide.imageAttribution ? (
+                      <p className="fl-app-modal-attrib">{slide.imageAttribution}</p>
+                    ) : null}
                   </figure>
                 ) : null}
               </div>
@@ -431,8 +498,8 @@ export default function ResultsPage() {
                 Polish in Canva (optional)
               </a>
               <p className="fl-app-modal-note">
-                Slides can include images from your JSON (https URLs) or AI-generated art from each slide’s prompt (resolved on the
-                server). You get a real .pptx and full-screen view; Canva is optional for redesign.
+                With <code className="fl-app-code-inline">UNSPLASH_ACCESS_KEY</code> set, slide photos come from Unsplash (attributed).
+                Otherwise optional prompts fall back to abstract generated imagery. Export .pptx or present full-screen; Canva is optional.
               </p>
             </div>
           </div>

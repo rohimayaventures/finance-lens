@@ -1,22 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
+import { analysisResultSchema } from "@/lib/schemas/analysis";
 
 type AnalyzeBody = {
   text?: string;
   docType?: string;
   driftEnabled?: boolean;
   confidenceEnabled?: boolean;
-};
-
-type AnalysisResult = {
-  whatTheySaid: string;
-  whatItMeans: string;
-  keyNumbers: Array<{ value: string; label: string; direction: string }>;
-  driftSignals: Array<{ type: "hedge" | "firm"; quote: string }>;
-  flags: Array<{ text: string }>;
-  confidenceScore: number | null;
-  driftCount: number;
-  flagCount: number;
 };
 
 function getDocSpecificPrompt(rawDocType: string): string {
@@ -56,43 +47,25 @@ function getDocSpecificPrompt(rawDocType: string): string {
   ].join("\n");
 }
 
-function extractTextContent(content: Anthropic.Messages.Message["content"]): string {
-  const chunks: string[] = [];
-  for (const block of content) {
-    if (block.type === "text") {
-      chunks.push(block.text);
-    }
-  }
-  return chunks.join("\n").trim();
-}
-
-function parseJsonResponse(raw: string): AnalysisResult {
-  try {
-    return JSON.parse(raw) as AnalysisResult;
-  } catch {
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    if (start >= 0 && end > start) {
-      return JSON.parse(raw.slice(start, end + 1)) as AnalysisResult;
-    }
-    throw new Error("Could not parse model JSON response");
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "Server missing ANTHROPIC_API_KEY." }, { status: 503 });
+    }
+
     const body = (await request.json()) as AnalyzeBody;
     const text = body.text?.trim() ?? "";
 
     if (!text) {
-      return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
+      return NextResponse.json({ error: "Document text is required." }, { status: 400 });
     }
 
     const docType = body.docType ?? "earnings";
     const driftEnabled = body.driftEnabled !== false;
     const confidenceEnabled = body.confidenceEnabled !== false;
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const anthropic = new Anthropic({ apiKey });
 
     const systemPrompt = [
       "You are FinanceLens AI, a financial document intelligence analyst.",
@@ -102,6 +75,9 @@ export async function POST(request: NextRequest) {
       "Use attribution language throughout: \"this may suggest\", \"this is consistent with\", \"this language pattern is typically associated with\".",
       "Never use language that could be interpreted as a buy, sell, or hold recommendation.",
       "Frame all outputs as assistive analysis, not financial advice.",
+      "",
+      "supportingEvidence: 2–6 objects. Each quote must be a short verbatim or near-verbatim excerpt from the user's document (max ~240 characters per quote).",
+      "context is optional (e.g. speaker, section name). If the excerpt has no strong anchor phrases, include fewer items.",
       "",
       "Return this exact JSON shape:",
       "{",
@@ -116,44 +92,33 @@ export async function POST(request: NextRequest) {
       '  "flags": [',
       '    { "text": "string — specific flag with evidence" }',
       "  ],",
-      '  "confidenceScore": integer 0–100 — your estimate of how well-supported this analysis is by concrete detail in the source excerpt: richer numbers, named entities, specific claims => higher; sparse or ambiguous text => lower. Not a statistical confidence interval and not a performance prediction.',
-      '  "driftCount": number,',
-      '  "flagCount": number',
+      '  "supportingEvidence": [',
+      '    { "quote": "string — anchored to source text", "context": "optional string" }',
+      "  ],",
+      '  "confidenceScore": integer 0–100 or null — your estimate of how well-supported this analysis is by concrete detail in the source excerpt: richer numbers, named entities, specific claims => higher; sparse or ambiguous text => lower. Not a statistical confidence interval and not a performance prediction.',
       "}",
     ].join("\n");
 
     const userMessage = `Analyze this document:\n\n${text}`;
 
-    const response = await anthropic.messages.create({
+    let normalized = await claudeJsonWithRetry(anthropic, {
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      maxTokens: 4096,
       system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
+      user: userMessage,
+      schema: analysisResultSchema,
     });
 
-    const rawText = extractTextContent(response.content);
-    const parsed = parseJsonResponse(rawText);
-
-    const normalized: AnalysisResult = {
-      whatTheySaid: parsed.whatTheySaid ?? "",
-      whatItMeans: parsed.whatItMeans ?? "",
-      keyNumbers: Array.isArray(parsed.keyNumbers) ? parsed.keyNumbers : [],
-      driftSignals: Array.isArray(parsed.driftSignals) ? parsed.driftSignals : [],
-      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
-      confidenceScore: typeof parsed.confidenceScore === "number" ? Math.max(0, Math.min(100, parsed.confidenceScore)) : null,
-      driftCount: typeof parsed.driftCount === "number" ? parsed.driftCount : 0,
-      flagCount: typeof parsed.flagCount === "number" ? parsed.flagCount : 0,
-    };
-
     if (!driftEnabled) {
-      normalized.driftSignals = [];
-      normalized.driftCount = 0;
-    } else {
-      normalized.driftCount = normalized.driftSignals.length;
+      normalized = {
+        ...normalized,
+        driftSignals: [],
+        driftCount: 0,
+      };
     }
 
     if (!confidenceEnabled) {
-      normalized.confidenceScore = null;
+      normalized = { ...normalized, confidenceScore: null };
     }
 
     normalized.flagCount = normalized.flags.length;

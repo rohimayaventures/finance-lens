@@ -68,15 +68,27 @@ export async function downloadBriefingPptx(content: BriefingDeckPayload): Promis
         h: 4.25,
         rounding: true,
       });
+      const capY = bodyY + 4.32;
       if (s.imageCaption) {
         slide.addText(s.imageCaption, {
           x: 7.92,
-          y: bodyY + 4.32,
+          y: capY,
           w: 4.85,
           h: 0.55,
           fontSize: 10,
           italic: true,
           color: "555555",
+          fontFace: "Calibri",
+        });
+      }
+      if (s.imageAttribution) {
+        slide.addText(s.imageAttribution, {
+          x: 7.92,
+          y: capY + (s.imageCaption ? 0.58 : 0),
+          w: 4.85,
+          h: 0.42,
+          fontSize: 8,
+          color: "888888",
           fontFace: "Calibri",
         });
       }

@@ -114,6 +114,7 @@ export default function BriefingDeckPage() {
                 onError={() => setImgBroken(true)}
               />
               {slide.imageCaption ? <figcaption className="fl-deck-slide-cap">{slide.imageCaption}</figcaption> : null}
+              {slide.imageAttribution ? <p className="fl-deck-slide-attrib">{slide.imageAttribution}</p> : null}
             </figure>
           ) : null}
         </div>

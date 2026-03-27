@@ -78,10 +78,13 @@ Create `.env.local`:
 
 ```bash
 ANTHROPIC_API_KEY=your_key_here
+UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 CANVA_API_TOKEN=your_canva_token_here
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
+
+`UNSPLASH_ACCESS_KEY` is the Unsplash **Access Key** (Client ID). It powers stock photography in briefing decks. Without it, decks still work using optional abstract image prompts as a fallback.
 
 Run locally:
 
@@ -100,6 +103,7 @@ Open `http://localhost:3000`
 | `/` | Landing page |
 | `/analyze` | Document input and five-section analysis output |
 | `/compare` | Two-document comparison mode |
+| `/methodology` | How the product works: LLMs, validation, decks, imagery |
 | `/api/analyze` | Claude analysis route — returns structured JSON |
 | `/api/slides` | Slide content formatter for Canva generation |
 | `/api/canva` | Canva deck generation via Canva API |
