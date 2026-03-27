@@ -87,7 +87,7 @@ export default function Home() {
               <Link href="/analyze" className="fl-btn-primary">
                 Try it free →
               </Link>
-              <Link href="/analyze" className="fl-btn-ghost">
+              <Link href="/analyze?sample=earnings" className="fl-btn-ghost">
                 See an example
               </Link>
               <span className="fl-hero-note">No login required</span>
