@@ -14,6 +14,11 @@ type Analysis = {
   flagCount: number;
 };
 
+type SlideContent = {
+  title: string;
+  slides: Array<{ headline: string; bullets: string[] }>;
+};
+
 const sectionLinks = [
   { id: "section-1", label: "What they said", color: "var(--gray-4)" },
   { id: "section-2", label: "What it actually means", color: "var(--ink)" },
@@ -32,7 +37,8 @@ export default function ResultsPage() {
   const [docType, setDocType] = useState("");
   const [preview, setPreview] = useState("");
   const [canvaLoading, setCanvaLoading] = useState(false);
-  const [canvaError, setCanvaError] = useState("");
+  const [isOutlineOpen, setIsOutlineOpen] = useState(false);
+  const [slideContent, setSlideContent] = useState<SlideContent | null>(null);
 
   useEffect(() => {
     const rawAnalysis = sessionStorage.getItem("fl_analysis");
@@ -68,22 +74,31 @@ export default function ResultsPage() {
     if (!safeAnalysis) return;
 
     setCanvaLoading(true);
-    setCanvaError("");
 
     try {
       const response = await fetch("/api/canva", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysis: safeAnalysis }),
+        body: JSON.stringify(safeAnalysis),
       });
 
       if (!response.ok) throw new Error("Canva request failed");
 
-      const payload = (await response.json()) as { url?: string };
-      if (!payload.url) throw new Error("No URL returned");
-      window.open(payload.url, "_blank", "noopener,noreferrer");
+      const payload = (await response.json()) as { slideContent?: SlideContent; success?: boolean };
+      if (!payload.slideContent) throw new Error("No slide content returned");
+      setSlideContent(payload.slideContent);
+      setIsOutlineOpen(true);
     } catch (_err) {
-      setCanvaError("Could not generate Canva deck right now.");
+      setSlideContent({
+        title: "FinanceLens AI presentation",
+        slides: [
+          {
+            headline: "Could not generate outline",
+            bullets: ["Please try again in a moment.", "If this continues, refresh and retry.", "You can still open Canva manually."],
+          },
+        ],
+      });
+      setIsOutlineOpen(true);
     } finally {
       setCanvaLoading(false);
     }
@@ -138,35 +153,35 @@ export default function ResultsPage() {
         </div>
       </nav>
 
-      <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 md:grid-cols-[240px_1fr]">
+      <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 md:grid-cols-[220px_1fr]">
         <aside
-          className="hidden border-b border-r-0 p-6 md:sticky md:top-14 md:flex md:h-[calc(100dvh-56px)] md:flex-col md:overflow-y-auto md:border-b-0 md:border-r md:gap-6"
-          style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}
+          className="hidden border-b border-r-0 md:sticky md:top-14 md:flex md:h-[calc(100dvh-56px)] md:min-w-[220px] md:flex-col md:overflow-y-auto md:border-b-0 md:border-r md:gap-6"
+          style={{ background: "var(--gray-1)", borderColor: "#E0DCD4", padding: "28px 20px" }}
         >
-          <p className="text-[16px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
+          <p className="text-[14px] leading-relaxed" style={{ color: "var(--gray-5)" }}>
             {preview.slice(0, 60)}...
           </p>
 
           <div className="flex flex-wrap gap-3">
-            <span className="mono rounded-[2px] px-2 py-1 text-[14px]" style={{ background: "var(--ink)", color: "#fff" }}>
+            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--ink)", color: "#fff" }}>
               {docType}
             </span>
-            <span className="mono rounded-[2px] px-2 py-1 text-[14px]" style={{ background: "var(--red)", color: "#fff" }}>
+            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--red)", color: "#fff" }}>
               Flags {safeAnalysis.flagCount}
             </span>
-            <span className="mono rounded-[2px] px-2 py-1 text-[14px]" style={{ background: "var(--amber)", color: "#fff" }}>
+            <span className="mono rounded-[2px] px-2 py-1 text-[13px]" style={{ background: "var(--amber)", color: "#fff" }}>
               Drift {safeAnalysis.driftCount}
             </span>
           </div>
 
           <div>
-            <p className="mono mb-3 text-[14px] uppercase tracking-[0.12em]" style={{ color: "var(--gray-5)" }}>
+            <p className="mono mb-3 text-[13px] uppercase tracking-[0.12em]" style={{ color: "var(--gray-5)" }}>
               Confidence
             </p>
             <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: "var(--gray-3)" }}>
               <div className="h-full" style={{ width: `${safeAnalysis.confidenceScore}%`, background: "var(--ink)" }} />
             </div>
-            <p className="mono mt-3 text-[14px] font-bold" style={{ color: "var(--ink)" }}>
+            <p className="mono mt-3 text-[13px] font-bold" style={{ color: "var(--ink)" }}>
               {safeAnalysis.confidenceScore}%
             </p>
           </div>
@@ -178,7 +193,7 @@ export default function ResultsPage() {
               <a
                 key={item.id}
                 href={`#${item.id}`}
-                className="mono flex items-center gap-2 py-2 text-[14px]"
+                className="mono flex items-center gap-2 py-2 text-[13px]"
                 style={{ color: "var(--gray-5)" }}
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
@@ -203,49 +218,44 @@ export default function ResultsPage() {
           >
             Share analysis
           </button>
-          {canvaError ? (
-            <p className="mono text-[14px]" style={{ color: "var(--red)" }}>
-              {canvaError}
-            </p>
-          ) : null}
         </aside>
 
-        <main className="max-h-[calc(100dvh-56px)] overflow-y-auto px-5 py-6 md:px-12 md:py-10">
-          <div className="mx-auto flex w-full max-w-[800px] flex-col pb-10">
-            <section id="section-1" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
+        <main className="max-h-[calc(100dvh-56px)] overflow-y-auto px-5 py-6 md:px-12 md:py-12">
+          <div className="mx-auto flex w-full max-w-[860px] flex-col pb-10">
+            <section id="section-1" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>01</p>
-                <h2 className="text-[26px] font-bold">What they said</h2>
+                <h2 className="text-[28px] font-bold">What they said</h2>
               </header>
-              <div className="px-8 py-7">
-                <p className="text-[17px] leading-[1.8]" style={{ color: "var(--gray-5)" }}>{safeAnalysis.whatTheySaid}</p>
+              <div className="p-8">
+                <p className="text-[18px] leading-[1.9]" style={{ color: "#444", maxWidth: "680px" }}>{safeAnalysis.whatTheySaid}</p>
               </div>
             </section>
 
-            <section id="section-2" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
+            <section id="section-2" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>02</p>
-                <h2 className="text-[26px] font-bold">What it actually means</h2>
+                <h2 className="text-[28px] font-bold">What it actually means</h2>
               </header>
-              <div className="px-8 py-7">
-                <p className="text-[17px] leading-[1.8]" style={{ color: "var(--gray-5)" }}>{safeAnalysis.whatItMeans}</p>
+              <div className="p-8">
+                <p className="text-[18px] leading-[1.9]" style={{ color: "#444", maxWidth: "680px" }}>{safeAnalysis.whatItMeans}</p>
               </div>
             </section>
 
-            <section id="section-3" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
+            <section id="section-3" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>03</p>
-                <h2 className="text-[26px] font-bold">Key numbers</h2>
+                <h2 className="text-[28px] font-bold">Key numbers</h2>
               </header>
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-5 px-8 py-7">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-5 p-8">
                 {safeAnalysis.keyNumbers.map((item, idx) => {
                   const directionLower = item.direction.toLowerCase();
                   const isUp = directionLower.startsWith("+") || directionLower.includes("up");
                   const directionColor = isUp ? "var(--green)" : "var(--red)";
 
                   return (
-                    <article key={`${item.label}-${idx}`} className="rounded-[2px] border p-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
-                      <p className="mono text-[32px] font-bold leading-none" style={{ color: "var(--ink)" }}>{item.value}</p>
+                    <article key={`${item.label}-${idx}`} className="rounded-[2px] border p-5" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)", minWidth: "160px" }}>
+                      <p className="mono text-[36px] font-bold leading-none" style={{ color: "var(--ink)" }}>{item.value}</p>
                       <p className="mono mt-1 text-[13px] uppercase tracking-[0.1em]" style={{ color: "var(--gray-4)" }}>{item.label}</p>
                       <p className="mono mt-2 text-[13px] font-bold" style={{ color: directionColor }}>{item.direction}</p>
                     </article>
@@ -254,12 +264,12 @@ export default function ResultsPage() {
               </div>
             </section>
 
-            <section id="section-4" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
+            <section id="section-4" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>04</p>
-                <h2 className="text-[26px] font-bold">Language drift</h2>
+                <h2 className="text-[28px] font-bold">Language drift</h2>
               </header>
-              <div className="flex flex-col gap-3 px-8 py-7">
+              <div className="p-8">
                 {safeAnalysis.driftSignals.map((signal, idx) => {
                   const isHedge = signal.type === "hedge";
                   const pillStyle = isHedge
@@ -267,7 +277,7 @@ export default function ResultsPage() {
                     : { background: "var(--green-light)", color: "var(--green)", borderColor: "var(--green-border)" };
 
                   return (
-                    <article key={`${signal.quote}-${idx}`} className="flex items-start gap-3">
+                    <article key={`${signal.quote}-${idx}`} className="flex items-start gap-3 border-b py-3 last:border-b-0" style={{ borderColor: "#F4F2EE" }}>
                       <span className="mono rounded-[99px] border px-2 py-1 text-[13px] uppercase tracking-[0.1em]" style={pillStyle}>
                         {signal.type}
                       </span>
@@ -278,16 +288,16 @@ export default function ResultsPage() {
               </div>
             </section>
 
-            <section id="section-5" className="mb-6 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
-              <header className="border-b px-5 py-4" style={{ background: "var(--gray-1)", borderColor: "var(--gray-2)" }}>
+            <section id="section-5" className="mb-8 overflow-hidden rounded-[2px] border last:mb-0" style={{ borderColor: "var(--gray-2)", background: "#fff" }}>
+              <header className="px-5 py-4" style={{ background: "var(--gray-1)", borderBottom: "2px solid #1C1C1E" }}>
                 <p className="mono text-[13px] tracking-[0.12em]" style={{ color: "var(--red)" }}>05</p>
-                <h2 className="text-[26px] font-bold">Worth a closer look</h2>
+                <h2 className="text-[28px] font-bold">Worth a closer look</h2>
               </header>
-              <div className="flex flex-col gap-3 px-8 py-7">
+              <div className="p-8">
                 {safeAnalysis.flags.map((flag, idx) => (
                   <article
                     key={`${flag.text}-${idx}`}
-                    className="rounded-[2px] border px-5 py-4"
+                    className="mb-[10px] rounded-[2px] border px-[22px] py-[18px] last:mb-0"
                     style={{
                       borderLeftWidth: "3px",
                       borderColor: "var(--red-border)",
@@ -322,6 +332,48 @@ export default function ResultsPage() {
           </div>
         </main>
       </div>
+
+      {isOutlineOpen && slideContent ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "rgba(0, 0, 0, 0.65)" }}>
+          <div className="relative w-full max-w-[600px] rounded-[2px] bg-white p-10 shadow-xl">
+            <button
+              type="button"
+              onClick={() => setIsOutlineOpen(false)}
+              className="mono absolute right-4 top-4 text-[14px] uppercase tracking-[0.12em]"
+              style={{ color: "var(--gray-5)" }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <h3 className="mb-2 text-[24px] font-bold">Your presentation outline</h3>
+            <p className="mono mb-6 text-[13px]" style={{ color: "var(--gray-4)" }}>
+              {slideContent.title}
+            </p>
+            <div className="max-h-[55vh] overflow-y-auto pr-1">
+              {slideContent.slides.map((slide, index) => (
+                <div key={`${slide.headline}-${index}`} className="mb-5 last:mb-0">
+                  <h4 className="mb-2 text-[18px] font-bold">{index + 1}. {slide.headline}</h4>
+                  <ul className="pl-5">
+                    {slide.bullets.map((bullet, bulletIndex) => (
+                      <li key={`${bullet}-${bulletIndex}`} className="mono mb-1 text-[13px]" style={{ color: "var(--gray-5)" }}>
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => window.open("https://www.canva.com/create/presentations/", "_blank", "noopener,noreferrer")}
+              className="mono mt-8 w-full rounded-[2px] px-4 py-3 text-[14px] uppercase tracking-[0.12em]"
+              style={{ background: "var(--ink)", color: "#fff" }}
+            >
+              Open Canva
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
