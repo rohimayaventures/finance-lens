@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { BriefingDeckPayload } from "@/lib/briefingTypes";
-
-const STORAGE_KEY = "fl_briefing_deck";
+import { readBriefingDeckRaw } from "@/lib/briefingDeckStorage";
 
 export default function BriefingDeckPage() {
   const [payload, setPayload] = useState<BriefingDeckPayload | null>(null);
@@ -13,7 +12,7 @@ export default function BriefingDeckPage() {
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const raw = readBriefingDeckRaw();
       if (!raw) return;
       const parsed = JSON.parse(raw) as BriefingDeckPayload;
       if (parsed?.slides?.length) {
@@ -68,7 +67,10 @@ export default function BriefingDeckPage() {
     return (
       <div className="fl-deck-empty">
         <p className="fl-deck-empty-title">No briefing deck loaded</p>
-        <p className="fl-deck-empty-copy">Generate a deck from your analysis results, then open full-screen slides again.</p>
+        <p className="fl-deck-empty-copy">
+          Open full-screen from the <strong>results</strong> page after you build a briefing deck (the new tab cannot read the other
+          tab’s session). If you did that and still see this, check that cookies/storage are not blocked for this site.
+        </p>
         <Link href="/analyze" className="fl-deck-empty-link">
           Run an analysis
         </Link>

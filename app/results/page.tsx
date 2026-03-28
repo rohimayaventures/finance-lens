@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BriefingDeckPayload } from "@/lib/briefingTypes";
+import { persistBriefingDeckForViewer } from "@/lib/briefingDeckStorage";
 import { downloadBriefingPptx } from "@/lib/briefingExport";
 
 /** Section is “current” once its top crosses this far down the viewport (handles tall sections). */
@@ -166,14 +167,15 @@ export default function ResultsPage() {
     }
   };
 
-  const BRIEFING_DECK_KEY = "fl_briefing_deck";
-
   const openFullScreenDeck = (content: BriefingDeckPayload) => {
     try {
-      sessionStorage.setItem(BRIEFING_DECK_KEY, JSON.stringify(content));
-      window.open("/briefing/deck", "_blank", "noopener,noreferrer");
+      persistBriefingDeckForViewer(content);
+      const w = window.open("/briefing/deck", "_blank", "noopener,noreferrer");
+      if (!w) {
+        setOutlineError("Pop-up blocked. Allow pop-ups for this site, or use Download PowerPoint below.");
+      }
     } catch {
-      setOutlineError("Could not open slide view. Try allowing pop-ups for this site.");
+      setOutlineError("Could not open slide view. Check browser storage permissions or try again.");
     }
   };
 
@@ -182,8 +184,11 @@ export default function ResultsPage() {
     setOutlineError("");
     try {
       await downloadBriefingPptx(content);
-    } catch {
-      setOutlineError("Could not build the PowerPoint file. Try again or use full-screen slides.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setOutlineError(
+        `Could not build the PowerPoint file (${msg}). If downloads are blocked, allow downloads for this site.`,
+      );
     } finally {
       setDeckExporting(false);
     }

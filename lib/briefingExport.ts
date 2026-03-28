@@ -127,5 +127,33 @@ export async function downloadBriefingPptx(content: BriefingDeckPayload): Promis
   }
 
   const base = safeFileBase(content.title);
-  await pptx.writeFile({ fileName: `${base}.pptx` });
+  const fileName = `${base}.pptx`;
+
+  // writeFile() after long async work is often blocked as “not user-initiated”.
+  // Blob + <a download> keeps saves reliable after image fetches.
+  try {
+    const result = await pptx.write({ outputType: "blob" });
+    const blob =
+      result instanceof Blob
+        ? result
+        : new Blob([result as BlobPart], {
+            type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          });
+
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    await pptx.writeFile({ fileName });
+  }
 }
