@@ -54,6 +54,8 @@ export default function ResultsPage() {
   const [outlineLoading, setOutlineLoading] = useState(false);
   const [outlineModal, setOutlineModal] = useState<BriefingDeckPayload | null>(null);
   const [outlineError, setOutlineError] = useState("");
+  const [shareError, setShareError] = useState("");
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [deckExporting, setDeckExporting] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState<string>("s1");
 
@@ -139,6 +141,45 @@ export default function ResultsPage() {
       cancelAnimationFrame(raf);
     };
   }, [analysis, tocSections]);
+
+  const handleExportPdf = async () => {
+    if (!analysis) return;
+    setPdfExporting(true);
+    setShareError("");
+    try {
+      const res = await fetch("/api/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ analysis, docType, preview }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setShareError(typeof data.error === "string" ? data.error : "Could not generate PDF. Try again.");
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition");
+      const match = cd?.match(/filename="([^"]+)"/);
+      const filename = match?.[1] ?? "FinanceLens-analysis.pdf";
+      const url = URL.createObjectURL(blob);
+      try {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.rel = "noopener";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      setShareError("Could not download PDF. Try again or allow downloads for this site.");
+    } finally {
+      setPdfExporting(false);
+    }
+  };
 
   const openBriefingOutline = async () => {
     if (!analysis) return;
@@ -309,11 +350,18 @@ export default function ResultsPage() {
           >
             {outlineLoading ? "Working…" : "Build briefing deck →"}
           </button>
-          <button type="button" className="fl-app-sidebar-btn fl-app-sidebar-btn--ghost" disabled title="Coming soon">
-            Share analysis
+          <button
+            type="button"
+            className="fl-app-sidebar-btn fl-app-sidebar-btn--ghost"
+            onClick={handleExportPdf}
+            disabled={pdfExporting}
+          >
+            {pdfExporting ? "Building PDF…" : "Share as PDF →"}
           </button>
 
-          {outlineError ? <p className="fl-app-sidebar-note">{outlineError}</p> : null}
+          {outlineError || shareError ? (
+            <p className="fl-app-sidebar-note">{outlineError || shareError}</p>
+          ) : null}
         </aside>
 
         <main className="fl-app-main" id="main-content">

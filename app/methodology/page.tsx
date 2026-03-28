@@ -81,7 +81,8 @@ export default function MethodologyPage() {
             <p>
               Today, results are held in your browser session (for example, <code className="fl-app-code-inline">sessionStorage</code>) until
               you close the tab. The server processes requests for analysis, compare, and decks but is not designed as long-term storage for
-              your documents unless you add that separately.
+              your documents unless you add that separately. Use <strong>Share as PDF</strong> on the results page to download a branded
+              snapshot you can keep or send—generation happens on demand and is not stored by us.
             </p>
           </section>
 
