@@ -86,6 +86,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 `UNSPLASH_ACCESS_KEY` is the Unsplash **Access Key** (Client ID). It powers stock photography in briefing decks. Without it, decks still work using optional abstract image prompts as a fallback.
 
+Optional analysis tuning (all default sensibly if unset):
+
+- `ANTHROPIC_ANALYZE_MODEL` — override the default Sonnet model id for **standard** (non-fast) runs.
+- `ANTHROPIC_ANALYZE_MODEL_FAST` — override the default Haiku model id when **Faster model** is on (default `claude-3-5-haiku-20241022`).
+- `ANTHROPIC_ANALYZE_MAX_TOKENS` / `ANTHROPIC_ANALYZE_MAX_TOKENS_FAST` — max output tokens (defaults 3072 / 2048, capped for safety).
+
+The analyze API route sets `maxDuration` to 120s so Vercel Pro (or similar) can finish long Claude calls; Hobby plans may still enforce shorter limits.
+
 Run locally:
 
 ```bash

@@ -31,13 +31,17 @@ export const analysisResultSchema = z
     flagCount: z.number().optional(),
   })
   .transform((o) => {
+    const keyNumbers = o.keyNumbers.slice(0, 6);
+    const driftSignals = o.driftSignals.slice(0, 5);
+    const flags = o.flags.slice(0, 5);
+
     const supportingEvidence = (o.supportingEvidence ?? [])
       .map((e) => ({
         quote: e.quote.trim().slice(0, 480),
         context: e.context?.trim().slice(0, 160),
       }))
       .filter((e) => e.quote.length > 0)
-      .slice(0, 8);
+      .slice(0, 5);
 
     let confidenceScore: number | null = null;
     if (o.confidenceScore !== undefined && o.confidenceScore !== null) {
@@ -50,13 +54,13 @@ export const analysisResultSchema = z
     return {
       whatTheySaid: o.whatTheySaid,
       whatItMeans: o.whatItMeans,
-      keyNumbers: o.keyNumbers,
-      driftSignals: o.driftSignals,
-      flags: o.flags,
+      keyNumbers,
+      driftSignals,
+      flags,
       supportingEvidence,
       confidenceScore,
-      driftCount: o.driftSignals.length,
-      flagCount: o.flags.length,
+      driftCount: driftSignals.length,
+      flagCount: flags.length,
     };
   });
 

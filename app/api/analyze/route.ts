@@ -3,12 +3,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
 import { analysisResultSchema } from "@/lib/schemas/analysis";
 
+/** Vercel: allow long Claude runs (upgrade plan if you still hit timeouts). */
+export const maxDuration = 120;
+
 type AnalyzeBody = {
   text?: string;
   docType?: string;
   driftEnabled?: boolean;
   confidenceEnabled?: boolean;
+  /** Use a smaller, faster model and tighter token budget (good default for long pastes). */
+  fastAnalysis?: boolean;
 };
+
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function resolveAnalyzeModel(fast: boolean): string {
+  if (fast) {
+    return (
+      process.env.ANTHROPIC_ANALYZE_MODEL_FAST?.trim() ||
+      "claude-3-5-haiku-20241022"
+    );
+  }
+  return process.env.ANTHROPIC_ANALYZE_MODEL?.trim() || "claude-sonnet-4-20250514";
+}
+
+function resolveMaxTokens(fast: boolean): number {
+  if (fast) {
+    return Math.min(4096, parsePositiveInt(process.env.ANTHROPIC_ANALYZE_MAX_TOKENS_FAST, 2048));
+  }
+  return Math.min(8192, parsePositiveInt(process.env.ANTHROPIC_ANALYZE_MAX_TOKENS, 3072));
+}
 
 function getDocSpecificPrompt(rawDocType: string): string {
   const normalized = rawDocType.toLowerCase();
@@ -64,12 +92,18 @@ export async function POST(request: NextRequest) {
     const docType = body.docType ?? "earnings";
     const driftEnabled = body.driftEnabled !== false;
     const confidenceEnabled = body.confidenceEnabled !== false;
+    const fastAnalysis = body.fastAnalysis === true;
 
     const anthropic = new Anthropic({ apiKey });
+    const model = resolveAnalyzeModel(fastAnalysis);
+    const maxTokens = resolveMaxTokens(fastAnalysis);
 
     const systemPrompt = [
       "You are FinanceLens AI, a financial document intelligence analyst.",
       getDocSpecificPrompt(docType),
+      "",
+      "Keep the JSON compact for latency: at most 6 keyNumbers, 5 driftSignals, 5 flags, 5 supportingEvidence items.",
+      "whatTheySaid and whatItMeans: each 2–4 tight paragraphs unless the document absolutely requires more.",
       "",
       "Return ONLY valid JSON, no markdown, no explanation, no preamble.",
       "Use attribution language throughout: \"this may suggest\", \"this is consistent with\", \"this language pattern is typically associated with\".",
@@ -102,8 +136,8 @@ export async function POST(request: NextRequest) {
     const userMessage = `Analyze this document:\n\n${text}`;
 
     let normalized = await claudeJsonWithRetry(anthropic, {
-      model: "claude-sonnet-4-20250514",
-      maxTokens: 4096,
+      model,
+      maxTokens,
       system: systemPrompt,
       user: userMessage,
       schema: analysisResultSchema,

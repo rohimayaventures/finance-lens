@@ -102,6 +102,9 @@ export default function AnalyzePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeSampleId, setActiveSampleId] = useState<SampleId | null>(null);
+  /** Haiku by default — much faster than Sonnet for typical pastes. */
+  const [fastAnalysis, setFastAnalysis] = useState(true);
+  const [elapsedSec, setElapsedSec] = useState(0);
 
   const finalText = useMemo(() => {
     if (activeTab === "upload") {
@@ -111,6 +114,15 @@ export default function AnalyzePage() {
   }, [activeTab, text, uploadText]);
 
   const isDisabled = isLoading || finalText.trim().length === 0;
+  const charCount = finalText.trim().length;
+  const longDoc = charCount > 18_000;
+
+  useEffect(() => {
+    if (!isLoading) return;
+    setElapsedSec(0);
+    const id = window.setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [isLoading]);
 
   useEffect(() => {
     const sampleParam = new URLSearchParams(window.location.search).get("sample");
@@ -174,6 +186,7 @@ export default function AnalyzePage() {
           docType,
           driftEnabled,
           confidenceEnabled,
+          fastAnalysis,
         }),
       });
 
@@ -244,7 +257,7 @@ export default function AnalyzePage() {
             />
             Drift detection
           </label>
-          <label className="fl-app-check fl-app-check--last">
+          <label className="fl-app-check">
             <input
               type="checkbox"
               checked={confidenceEnabled}
@@ -252,6 +265,17 @@ export default function AnalyzePage() {
             />
             Confidence scoring
           </label>
+          <label className="fl-app-check fl-app-check--last">
+            <input
+              type="checkbox"
+              checked={fastAnalysis}
+              onChange={(event) => setFastAnalysis(event.target.checked)}
+            />
+            Faster model (Haiku)
+          </label>
+          <p className="fl-app-sidebar-hint fl-app-hint-below-checks">
+            Turn off for Sonnet when you want maximum depth—usually slower, especially on long documents.
+          </p>
         </aside>
 
         <main className="fl-app-main" id="main-content">
@@ -311,8 +335,15 @@ export default function AnalyzePage() {
               </div>
             )}
 
+            {longDoc ? (
+              <p className="fl-app-hint fl-app-hint-spaced">
+                Long paste ({charCount.toLocaleString()} characters)—first run can take a bit while the model reads the full text. Use{" "}
+                <strong>Faster model (Haiku)</strong> on the left for shorter waits.
+              </p>
+            ) : null}
+
             <button type="submit" disabled={isDisabled} className="fl-app-submit">
-              {isLoading ? "Analyzing…" : "Run analysis"}
+              {isLoading ? `Analyzing… ${elapsedSec}s` : "Run analysis"}
             </button>
 
             <Link href="/compare" className="fl-app-link-quiet">

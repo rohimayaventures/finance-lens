@@ -1372,6 +1372,10 @@ header[id] {
   margin-bottom: 0;
 }
 
+.fl-app-hint-below-checks {
+  margin-top: 6px;
+}
+
 .fl-app-hint-spaced {
   margin-top: 10px;
 }
