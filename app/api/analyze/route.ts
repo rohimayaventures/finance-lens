@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
 import { analysisResultSchema } from "@/lib/schemas/analysis";
+import { getSupabase } from "@/lib/supabase";
 
 /** Vercel: allow long Claude runs (upgrade plan if you still hit timeouts). */
 export const maxDuration = 120;
@@ -157,7 +159,35 @@ export async function POST(request: NextRequest) {
 
     normalized.flagCount = normalized.flags.length;
 
-    return NextResponse.json(normalized);
+    const shareSlug = nanoid(10);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    let shareSlugOut: string | null = null;
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase.from("financelens_sessions").insert({
+          document_type: docType,
+          document_text: text.slice(0, 5000),
+          analysis: normalized,
+          slides: null,
+          share_slug: shareSlug,
+          layout: "briefing",
+          expires_at: expiresAt,
+        });
+        if (error) {
+          console.error("financelens_sessions insert (analyze):", error);
+        } else {
+          shareSlugOut = shareSlug;
+        }
+      } catch (err) {
+        console.error("financelens_sessions insert (analyze):", err);
+      }
+    } else {
+      console.warn("financelens_sessions insert (analyze): Supabase env vars missing; skipping persist.");
+    }
+
+    return NextResponse.json({ ...normalized, shareSlug: shareSlugOut });
   } catch {
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   }

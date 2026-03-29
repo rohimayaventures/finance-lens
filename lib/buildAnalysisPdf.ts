@@ -174,7 +174,7 @@ export async function buildAnalysisPdfBytes(payload: PdfAnalysisPayload): Promis
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const ctx: Ctx = { pdfDoc, page, y: PAGE_H - M, font, fontBold, pageNum: 1 };
 
   drawFooter(ctx);

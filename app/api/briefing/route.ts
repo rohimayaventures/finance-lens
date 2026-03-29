@@ -1,8 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
-import { briefingOutlineRawSchema } from "@/lib/schemas/briefingOutline";
+import { deckShareUrl } from "@/lib/publicAppUrl";
 import { resolveBriefingImages } from "@/lib/briefingResolveSlides";
+import { briefingOutlineRawSchema } from "@/lib/schemas/briefingOutline";
+import { getSupabase } from "@/lib/supabase";
 
 /** Payload from /results — same shape as analysis JSON */
 type AnalysisInput = {
@@ -12,6 +15,11 @@ type AnalysisInput = {
   driftSignals?: Array<{ type: string; quote: string }>;
   flags?: Array<{ text: string }>;
   confidenceScore?: number;
+};
+
+type BriefingBody = AnalysisInput & {
+  document_type?: string;
+  document_text?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -24,7 +32,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const analysis = (await req.json()) as AnalysisInput;
+    const body = (await req.json()) as BriefingBody;
+    const analysis = body;
     if (!analysis.whatTheySaid && !analysis.whatItMeans) {
       return NextResponse.json({ error: "Invalid analysis payload." }, { status: 400 });
     }
@@ -100,7 +109,47 @@ export async function POST(req: NextRequest) {
 
     const slideContent = await resolveBriefingImages(rawOutline);
 
-    return NextResponse.json({ slideContent });
+    const documentType = typeof body.document_type === "string" && body.document_type.trim() ? body.document_type.trim() : "earnings";
+    const documentText =
+      typeof body.document_text === "string" ? body.document_text.slice(0, 5000) : "";
+
+    const shareSlug = nanoid(10);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    let shareUrl: string | null = null;
+    let persistedSlug: string | null = null;
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase.from("financelens_sessions").insert({
+          document_type: documentType,
+          document_text: documentText,
+          analysis: null,
+          slides: slideContent.slides,
+          share_slug: shareSlug,
+          layout: "briefing",
+          expires_at: expiresAt,
+        });
+        if (error) {
+          console.error("financelens_sessions insert (briefing):", error);
+        } else {
+          shareUrl = deckShareUrl(shareSlug);
+          persistedSlug = shareSlug;
+        }
+      } catch (err) {
+        console.error("financelens_sessions insert (briefing):", err);
+      }
+    } else {
+      console.warn("financelens_sessions insert (briefing): Supabase env vars missing; skipping persist.");
+    }
+
+    return NextResponse.json({
+      title: slideContent.title,
+      slides: slideContent.slides,
+      shareUrl,
+      shareSlug: persistedSlug,
+    });
   } catch (err) {
     console.error("Briefing outline error:", err);
     return NextResponse.json(

@@ -194,10 +194,19 @@ export default function AnalyzePage() {
         throw new Error("Analysis request failed");
       }
 
-      const result = (await response.json()) as unknown;
-      sessionStorage.setItem("fl_analysis", JSON.stringify(result));
+      const result = (await response.json()) as Record<string, unknown>;
+      const shareSlug = result.shareSlug;
+      const analysisPayload = { ...result };
+      delete analysisPayload.shareSlug;
+      sessionStorage.setItem("fl_analysis", JSON.stringify(analysisPayload));
       sessionStorage.setItem("fl_doctype", docType);
       sessionStorage.setItem("fl_text_preview", finalText.slice(0, 120));
+      sessionStorage.setItem("fl_document_text", finalText.slice(0, 5000));
+      if (typeof shareSlug === "string" && shareSlug.length > 0) {
+        sessionStorage.setItem("fl_share_slug", shareSlug);
+      } else {
+        sessionStorage.removeItem("fl_share_slug");
+      }
       router.push("/results");
     } catch (_err) {
       setError("Analysis failed. Please try again.");

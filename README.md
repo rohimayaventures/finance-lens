@@ -23,7 +23,7 @@ Paste a financial document and FinanceLens returns structured intelligence:
 
 **Compare mode:** Two documents side by side — new language, dropped language, confidence per doc, claim shifts.
 
-**Briefing deck (from results):** Claude builds a 7-slide outline; optional **Unsplash** photos (with `UNSPLASH_ACCESS_KEY`) or abstract image fallback; **download .pptx** and **full-screen** presenter view at `/briefing/deck`.
+**Briefing deck (from results):** Claude builds a 7-slide outline; optional **Unsplash** photos (with `UNSPLASH_ACCESS_KEY`) or abstract image fallback; **download .pptx**, **shareable `/deck/[slug]` URLs** (Supabase), and full-screen presenter view on that page.
 
 **Share as PDF:** Branded PDF export of the full analysis (`/api/export-pdf`).
 
@@ -55,9 +55,10 @@ Paste a financial document and FinanceLens returns structured intelligence:
 | Validation | Zod + one-shot JSON repair retry |
 | Deck file | pptxgenjs (client) |
 | PDF | pdf-lib (API route) |
+| Shares | Supabase (`financelens_sessions`) + `nanoid` slugs |
 | Deployment | Vercel |
 
-`@supabase/supabase-js` is in `package.json` for future use; **there is no Supabase integration in the app code yet**.
+**Supabase:** `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` persist analysis and briefing decks for **30-day** share links (`/deck/[slug]`). Row access depends on your RLS policies (insert + read by `share_slug`).
 
 ---
 
@@ -73,6 +74,9 @@ Create `.env.local`:
 
 ```bash
 ANTHROPIC_API_KEY=your_key_here
+NEXT_PUBLIC_APP_URL=https://financelens-ai.vercel.app
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 ```
 
@@ -102,10 +106,10 @@ Open `http://localhost:3000`
 | `/results` | Report, briefing, PDF |
 | `/compare` | Two-document compare |
 | `/methodology` | Trust, limits, how it works |
-| `/briefing/deck` | Full-screen slides (after opening from results) |
-| `/api/analyze` | Structured analysis JSON |
+| `/deck/[slug]` | Shared briefing deck or analysis (scroll + full-screen) |
+| `/api/analyze` | Structured analysis JSON (+ optional `shareSlug`) |
 | `/api/compare` | Compare JSON |
-| `/api/canva` | Briefing deck JSON + resolved slide images (name is legacy) |
+| `/api/briefing` | Briefing deck JSON + resolved slide images + share URL |
 | `/api/export-pdf` | Branded PDF |
 | `/api/parse-pdf` | Server PDF text (optional; analyze UI upload still uses a simple client decode — prefer paste for reliability) |
 

@@ -4,8 +4,14 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BriefingDeckPayload } from "@/lib/briefingTypes";
-import { persistBriefingDeckForViewer } from "@/lib/briefingDeckStorage";
 import { downloadBriefingPptx } from "@/lib/briefingExport";
+
+function clientShareBaseUrl(): string {
+  const v = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, "");
+  if (v) return v;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "https://financelens-ai.vercel.app";
+}
 
 /** Section is “current” once its top crosses this far down the viewport (handles tall sections). */
 function tocTriggerPx(): number {
@@ -53,6 +59,11 @@ export default function ResultsPage() {
   const [preview, setPreview] = useState("");
   const [outlineLoading, setOutlineLoading] = useState(false);
   const [outlineModal, setOutlineModal] = useState<BriefingDeckPayload | null>(null);
+  const [briefingShareUrl, setBriefingShareUrl] = useState<string | null>(null);
+  const [briefingShareSlug, setBriefingShareSlug] = useState<string | null>(null);
+  const [deckShareCopied, setDeckShareCopied] = useState(false);
+  const [analysisShareSlug, setAnalysisShareSlug] = useState<string | null>(null);
+  const [analysisShareCopied, setAnalysisShareCopied] = useState(false);
   const [outlineError, setOutlineError] = useState("");
   const [shareError, setShareError] = useState("");
   const [pdfExporting, setPdfExporting] = useState(false);
@@ -92,6 +103,12 @@ export default function ResultsPage() {
     }
     if (d) setDocType(d);
     if (p) setPreview(p);
+    try {
+      const slug = sessionStorage.getItem("fl_share_slug");
+      setAnalysisShareSlug(slug && slug.length > 0 ? slug : null);
+    } catch {
+      setAnalysisShareSlug(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -185,19 +202,40 @@ export default function ResultsPage() {
     if (!analysis) return;
     setOutlineLoading(true);
     setOutlineError("");
+    setBriefingShareUrl(null);
+    setBriefingShareSlug(null);
+    setDeckShareCopied(false);
+    let docSnap = "";
     try {
-      const res = await fetch("/api/canva", {
+      docSnap = sessionStorage.getItem("fl_document_text") ?? "";
+    } catch {
+      docSnap = "";
+    }
+    try {
+      const res = await fetch("/api/briefing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(analysis),
+        body: JSON.stringify({
+          ...analysis,
+          document_type: docType,
+          document_text: docSnap.slice(0, 5000),
+        }),
       });
-      const data = (await res.json()) as { slideContent?: BriefingDeckPayload; error?: string };
+      const data = (await res.json()) as {
+        title?: string;
+        slides?: BriefingDeckPayload["slides"];
+        shareUrl?: string | null;
+        shareSlug?: string | null;
+        error?: string;
+      };
       if (!res.ok) {
         setOutlineError(typeof data.error === "string" ? data.error : "Could not generate briefing outline. Please try again.");
         return;
       }
-      if (data.slideContent?.slides?.length) {
-        setOutlineModal(data.slideContent);
+      if (data.slides?.length) {
+        setOutlineModal({ title: data.title?.trim() || "Briefing deck", slides: data.slides });
+        setBriefingShareUrl(typeof data.shareUrl === "string" && data.shareUrl.length > 0 ? data.shareUrl : null);
+        setBriefingShareSlug(typeof data.shareSlug === "string" && data.shareSlug.length > 0 ? data.shareSlug : null);
       } else {
         setOutlineError(typeof data.error === "string" ? data.error : "Could not generate briefing outline. Please try again.");
       }
@@ -208,15 +246,37 @@ export default function ResultsPage() {
     }
   };
 
-  const openFullScreenDeck = (content: BriefingDeckPayload) => {
+  const copyDeckShareUrl = async () => {
+    if (!briefingShareUrl) return;
     try {
-      persistBriefingDeckForViewer(content);
-      const w = window.open("/briefing/deck", "_blank", "noopener,noreferrer");
-      if (!w) {
-        setOutlineError("Pop-up blocked. Allow pop-ups for this site, or use Download PowerPoint below.");
-      }
+      await navigator.clipboard.writeText(briefingShareUrl);
+      setDeckShareCopied(true);
+      window.setTimeout(() => setDeckShareCopied(false), 2000);
     } catch {
-      setOutlineError("Could not open slide view. Check browser storage permissions or try again.");
+      setOutlineError("Could not copy link. Try copying from the address bar after opening full screen.");
+    }
+  };
+
+  const copyAnalysisShareUrl = async () => {
+    if (!analysisShareSlug) return;
+    const url = `${clientShareBaseUrl()}/deck/${analysisShareSlug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setAnalysisShareCopied(true);
+      window.setTimeout(() => setAnalysisShareCopied(false), 2000);
+    } catch {
+      setShareError("Could not copy analysis link.");
+    }
+  };
+
+  const openDeckInNewTab = (slug: string | null) => {
+    if (!slug) {
+      setOutlineError("Share link was not saved (offline database). You can still download PowerPoint below.");
+      return;
+    }
+    const w = window.open(`/deck/${slug}`, "_blank", "noopener,noreferrer");
+    if (!w) {
+      setOutlineError("Pop-up blocked. Allow pop-ups for this site, or open the share link manually.");
     }
   };
 
@@ -357,6 +417,14 @@ export default function ResultsPage() {
             disabled={pdfExporting}
           >
             {pdfExporting ? "Building PDF…" : "Share as PDF →"}
+          </button>
+          <button
+            type="button"
+            className="fl-app-sidebar-btn fl-app-sidebar-btn--ghost"
+            onClick={copyAnalysisShareUrl}
+            disabled={!analysisShareSlug}
+          >
+            {analysisShareCopied ? "Copied!" : "Share analysis link →"}
           </button>
 
           {outlineError || shareError ? (
@@ -539,7 +607,19 @@ export default function ResultsPage() {
               >
                 {deckExporting ? "Building file…" : "Download PowerPoint (.pptx)"}
               </button>
-              <button type="button" className="fl-app-modal-btn fl-app-modal-btn--ghost" onClick={() => openFullScreenDeck(outlineModal)}>
+              <button
+                type="button"
+                className="fl-app-modal-btn fl-app-modal-btn--ghost"
+                onClick={copyDeckShareUrl}
+                disabled={!briefingShareUrl}
+              >
+                {deckShareCopied ? "Copied!" : "Share deck"}
+              </button>
+              <button
+                type="button"
+                className="fl-app-modal-btn fl-app-modal-btn--ghost"
+                onClick={() => openDeckInNewTab(briefingShareSlug)}
+              >
                 Open full-screen slides
               </button>
               <a
