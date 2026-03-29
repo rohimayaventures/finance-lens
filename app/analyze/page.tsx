@@ -8,6 +8,9 @@ type DocType = "earnings" | "tenk" | "regulatory";
 type InputTab = "paste" | "upload";
 type SampleId = "earnings" | "tenk" | "regulatory";
 
+const PDF_PARSE_FALLBACK =
+  "Could not extract text from this PDF. Please paste the document text directly.";
+
 const SAMPLES = [
   {
     id: "earnings",
@@ -98,7 +101,10 @@ export default function AnalyzePage() {
   const [text, setText] = useState("");
   const [uploadText, setUploadText] = useState("");
   const [uploadName, setUploadName] = useState("");
-  const [parsedCharCount, setParsedCharCount] = useState<number | null>(null);
+  const [pdfExtracting, setPdfExtracting] = useState(false);
+  const [pdfExtractNotice, setPdfExtractNotice] = useState<string | null>(null);
+  const [pdfTruncated, setPdfTruncated] = useState(false);
+  const [pdfParseError, setPdfParseError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeSampleId, setActiveSampleId] = useState<SampleId | null>(null);
@@ -113,7 +119,7 @@ export default function AnalyzePage() {
     return text;
   }, [activeTab, text, uploadText]);
 
-  const isDisabled = isLoading || finalText.trim().length === 0;
+  const isDisabled = isLoading || pdfExtracting || finalText.trim().length === 0;
   const charCount = finalText.trim().length;
   const longDoc = charCount > 18_000;
 
@@ -146,27 +152,53 @@ export default function AnalyzePage() {
     setActiveTab("paste");
     setActiveSampleId(sample.id);
     setError("");
+    setPdfExtractNotice(null);
+    setPdfTruncated(false);
+    setPdfParseError(null);
   };
 
   const loadedSample = activeSampleId ? SAMPLES.find((sample) => sample.id === activeSampleId) : null;
 
   const handlePdfUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    const input = event.target;
     if (!file) return;
 
+    setPdfParseError(null);
+    setPdfExtractNotice(null);
+    setPdfTruncated(false);
     setError("");
     setUploadName(file.name);
+    setPdfExtracting(true);
 
     try {
-      const buffer = await file.arrayBuffer();
-      const decoded = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-      const normalized = decoded.replace(/\s+/g, " ").trim();
-      setUploadText(normalized);
-      setParsedCharCount(normalized.length);
-    } catch (_err) {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/parse-pdf", { method: "POST", body: formData });
+      const data = (await res.json()) as {
+        text?: string;
+        pageCount?: number;
+        truncated?: boolean;
+        error?: string;
+      };
+
+      if (!res.ok || typeof data.text !== "string") {
+        setPdfParseError(typeof data.error === "string" ? data.error : PDF_PARSE_FALLBACK);
+        return;
+      }
+
+      setText(data.text);
       setUploadText("");
-      setParsedCharCount(null);
-      setError("Unable to parse this PDF in-browser. Try paste mode or a different file.");
+      setActiveTab("paste");
+      setActiveSampleId(null);
+      const pages = typeof data.pageCount === "number" ? data.pageCount : 0;
+      setPdfExtractNotice(`Text extracted from PDF (${pages} pages). Review below before analyzing.`);
+      setPdfTruncated(data.truncated === true);
+    } catch {
+      setPdfParseError(PDF_PARSE_FALLBACK);
+    } finally {
+      setPdfExtracting(false);
+      input.value = "";
     }
   };
 
@@ -303,8 +335,16 @@ export default function AnalyzePage() {
                 type="button"
                 onClick={() => setActiveTab("upload")}
                 className={`fl-app-tab${activeTab === "upload" ? " is-active" : ""}`}
+                style={{
+                  textTransform: "none",
+                  letterSpacing: "0.06em",
+                  lineHeight: 1.35,
+                  maxWidth: "min(100%, 20rem)",
+                  textAlign: "left",
+                  whiteSpace: "normal",
+                }}
               >
-                Upload PDF
+                Upload PDF (text extraction, not scanned pages)
               </button>
             </div>
 
@@ -326,21 +366,50 @@ export default function AnalyzePage() {
             </div>
 
             {activeTab === "paste" ? (
-              <textarea
-                value={text}
-                onChange={(event) => {
-                  setText(event.target.value);
-                  if (activeSampleId) setActiveSampleId(null);
-                }}
-                placeholder="Paste your earnings call transcript, 10-K filing, or regulatory notice here..."
-                className="fl-app-textarea"
-              />
+              <>
+                <textarea
+                  value={text}
+                  onChange={(event) => {
+                    setText(event.target.value);
+                    if (activeSampleId) setActiveSampleId(null);
+                  }}
+                  placeholder="Paste your earnings call transcript, 10-K filing, or regulatory notice here..."
+                  className="fl-app-textarea"
+                />
+                {pdfExtractNotice ? (
+                  <p className="fl-app-hint fl-app-hint-spaced" role="status">
+                    {pdfExtractNotice}
+                  </p>
+                ) : null}
+                {pdfTruncated ? (
+                  <p className="fl-app-hint fl-app-hint-spaced" role="status">
+                    Document truncated to 15,000 characters for analysis.
+                  </p>
+                ) : null}
+              </>
             ) : (
               <div className="fl-app-drop">
-                <span className="fl-app-drop-label">Upload PDF file</span>
-                <input type="file" accept=".pdf,application/pdf" onChange={handlePdfUpload} className="fl-app-file" />
+                <span className="fl-app-drop-label">
+                  Choose a PDF file — text extraction, not scanned pages
+                </span>
+                {pdfExtracting ? (
+                  <p className="fl-app-hint fl-app-hint-spaced" aria-live="polite">
+                    Extracting text…
+                  </p>
+                ) : null}
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handlePdfUpload}
+                  className="fl-app-file"
+                  disabled={pdfExtracting}
+                />
                 {uploadName ? <p className="fl-app-hint fl-app-hint-spaced">File: {uploadName}</p> : null}
-                {parsedCharCount !== null ? <p className="fl-app-hint">Parsed characters: {parsedCharCount.toLocaleString()}</p> : null}
+                {pdfParseError ? (
+                  <p className="fl-app-error fl-app-hint-spaced" role="alert">
+                    {pdfParseError}
+                  </p>
+                ) : null}
               </div>
             )}
 

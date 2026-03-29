@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DeckViewer, type SharedAnalysis } from "@/components/DeckViewer";
 import type { BriefingSlide } from "@/lib/briefingTypes";
+import { compareResultSchema } from "@/lib/schemas/compare";
 import { getPublicAppUrl } from "@/lib/publicAppUrl";
 import { isShareSessionExpired } from "@/lib/shareSessionExpiry";
 import { getSupabase } from "@/lib/supabase";
@@ -9,6 +10,7 @@ type SessionRow = {
   slides: unknown;
   analysis: unknown;
   expires_at: string;
+  layout?: string | null;
 };
 
 export default async function SharedDeckPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -22,7 +24,7 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ slu
 
   const { data, error } = await supabase
     .from("financelens_sessions")
-    .select("slides, analysis, expires_at")
+    .select("slides, analysis, expires_at, layout")
     .eq("share_slug", slug)
     .maybeSingle();
 
@@ -35,28 +37,79 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ slu
     return <ExpiredOrMissing homeUrl={homeUrl} />;
   }
 
-  const analysis =
-    row.analysis != null && typeof row.analysis === "object" ? (row.analysis as SharedAnalysis) : null;
+  const layoutCol = typeof row.layout === "string" && row.layout.trim() ? row.layout.trim() : null;
+  const analysisObj = row.analysis != null && typeof row.analysis === "object" ? row.analysis : null;
   const slides = Array.isArray(row.slides) ? (row.slides as BriefingSlide[]) : null;
-
   const hasSlides = Boolean(slides && slides.length > 0);
-  const hasAnalysis = Boolean(analysis && (analysis.whatTheySaid || analysis.whatItMeans));
 
-  if (!hasSlides && !hasAnalysis) {
+  const common = {
+    expiresAtIso: row.expires_at,
+    homeUrl,
+  };
+
+  if (hasSlides) {
+    return (
+      <DeckViewer
+        layout="briefing"
+        slides={slides}
+        analysis={null}
+        compareResult={null}
+        {...common}
+      />
+    );
+  }
+
+  if (!analysisObj) {
     return <ExpiredOrMissing homeUrl={homeUrl} />;
   }
 
-  const layout = hasSlides ? "briefing" : "analysis";
+  if (layoutCol === "compare") {
+    const parsed = compareResultSchema.safeParse(analysisObj);
+    if (!parsed.success) {
+      return (
+        <DeckViewer
+          layout="compare"
+          slides={null}
+          analysis={null}
+          compareResult={null}
+          compareInvalid
+          {...common}
+        />
+      );
+    }
+    return (
+      <DeckViewer
+        layout="compare"
+        slides={null}
+        analysis={null}
+        compareResult={parsed.data}
+        {...common}
+      />
+    );
+  }
 
-  return (
-    <DeckViewer
-      layout={layout}
-      slides={hasSlides ? slides : null}
-      analysis={layout === "analysis" ? analysis : null}
-      expiresAtIso={row.expires_at}
-      homeUrl={homeUrl}
-    />
-  );
+  const single = analysisObj as SharedAnalysis;
+  const hasSingleDoc = Boolean(single.whatTheySaid?.trim() || single.whatItMeans?.trim());
+  if (hasSingleDoc) {
+    return (
+      <DeckViewer layout="analysis" slides={null} analysis={single} compareResult={null} {...common} />
+    );
+  }
+
+  const legacyCompare = compareResultSchema.safeParse(analysisObj);
+  if (legacyCompare.success) {
+    return (
+      <DeckViewer
+        layout="compare"
+        slides={null}
+        analysis={null}
+        compareResult={legacyCompare.data}
+        {...common}
+      />
+    );
+  }
+
+  return <ExpiredOrMissing homeUrl={homeUrl} />;
 }
 
 function ExpiredOrMissing({ homeUrl }: { homeUrl: string }) {

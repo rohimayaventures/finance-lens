@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { BriefingSlide } from "@/lib/briefingTypes";
+import type { CompareResultValidated } from "@/lib/schemas/compare";
 
 type KeyNumber = { value: string; label: string; direction: string };
 type DriftSignal = { type: string; quote: string };
@@ -22,19 +23,37 @@ export type SharedAnalysis = {
 };
 
 export type DeckViewerProps = {
-  layout: "briefing" | "analysis";
+  layout: "briefing" | "analysis" | "compare";
   slides: BriefingSlide[] | null;
   analysis: SharedAnalysis | null;
+  /** Validated compare payload when `layout === "compare"`. */
+  compareResult?: CompareResultValidated | null;
+  /** Stored JSON failed validation — show a clean error. */
+  compareInvalid?: boolean;
   expiresAtIso: string;
   homeUrl: string;
 };
 
+type PanelKind =
+  | "briefing"
+  | "analysis-prose"
+  | "analysis-evidence"
+  | "analysis-stats"
+  | "analysis-drift"
+  | "analysis-flags"
+  | "compare-overview"
+  | "compare-columns"
+  | "compare-claims"
+  | "compare-confidence"
+  | "compare-metrics";
+
 type Panel = {
   key: string;
   title: string;
-  kind: "briefing" | "analysis-prose" | "analysis-evidence" | "analysis-stats" | "analysis-drift" | "analysis-flags";
+  kind: PanelKind;
   slide?: BriefingSlide;
   analysis?: SharedAnalysis;
+  compare?: CompareResultValidated;
 };
 
 function statTrendClass(direction: string): string {
@@ -54,7 +73,19 @@ function formatExpires(iso: string): string {
   });
 }
 
-export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: DeckViewerProps) {
+function sectionLabel(layout: DeckViewerProps["layout"]): string {
+  return layout === "briefing" ? "Slide" : "Section";
+}
+
+export function DeckViewer({
+  layout,
+  slides,
+  analysis,
+  compareResult,
+  compareInvalid,
+  expiresAtIso,
+  homeUrl,
+}: DeckViewerProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [fsIndex, setFsIndex] = useState(0);
   const [imgBroken, setImgBroken] = useState<Record<number, boolean>>({});
@@ -91,8 +122,21 @@ export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: 
       out.push({ key: "a5", title: "Worth a closer look", kind: "analysis-flags", analysis });
       return out;
     }
+    if (layout === "compare" && compareResult) {
+      const c = compareResult;
+      const out: Panel[] = [
+        { key: "c0", title: "Overview", kind: "compare-overview", compare: c },
+        { key: "c1", title: "New in B · Softened vs A", kind: "compare-columns", compare: c },
+        { key: "c2", title: "Claim & tone shifts", kind: "compare-claims", compare: c },
+        { key: "c3", title: "Confidence by document", kind: "compare-confidence", compare: c },
+      ];
+      if (c.metricsNarrative?.trim()) {
+        out.push({ key: "c4", title: "Metrics & guidance", kind: "compare-metrics", compare: c });
+      }
+      return out;
+    }
     return [];
-  }, [layout, slides, analysis]);
+  }, [layout, slides, analysis, compareResult]);
 
   const total = panels.length;
   const safeIndex = total > 0 ? Math.min(Math.max(0, fsIndex), total - 1) : 0;
@@ -125,10 +169,26 @@ export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: 
   }, [fullscreen, goFs]);
 
   const deckTitle =
-    layout === "briefing" && slides?.length ? slides[0]?.headline?.trim() || "Briefing deck" : "Analysis report";
+    layout === "briefing" && slides?.length
+      ? slides[0]?.headline?.trim() || "Briefing deck"
+      : layout === "compare"
+        ? "Document comparison"
+        : "Analysis report";
+
+  if (compareInvalid) {
+    return (
+      <div className="fl-viewer-missing">
+        <p className="fl-viewer-missing-title">This comparison could not be displayed.</p>
+        <Link href={homeUrl} className="fl-app-nav-btn">
+          Back to FinanceLens AI
+        </Link>
+      </div>
+    );
+  }
 
   const renderPanelBody = (p: Panel, mode: "scroll" | "fs", panelIndex: number) => {
     const a = p.analysis;
+    const c = p.compare;
     const monoClass = mode === "fs" ? "fl-viewer-fs-mono" : "fl-viewer-scroll-mono";
 
     if (p.kind === "briefing" && p.slide) {
@@ -160,6 +220,97 @@ export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: 
           ) : null}
         </div>
       );
+    }
+
+    if (p.kind === "compare-overview" && c) {
+      return <p className={mode === "fs" ? "fl-viewer-fs-prose" : "fl-viewer-scroll-prose"}>{c.overview}</p>;
+    }
+
+    if (p.kind === "compare-columns" && c) {
+      const colClass = mode === "fs" ? "fl-viewer-compare-col fl-viewer-compare-col--fs" : "fl-viewer-compare-col";
+      return (
+        <div className={mode === "fs" ? "fl-viewer-compare-cols fl-viewer-compare-cols--fs" : "fl-viewer-compare-cols"}>
+          <div className={colClass}>
+            <p className={`${monoClass} fl-viewer-compare-col-label`}>New or stronger in B</p>
+            <ul className="fl-viewer-scroll-list">
+              {c.newLanguage.length ? (
+                c.newLanguage.map((item, i) => (
+                  <li key={i} className="fl-viewer-compare-li">
+                    {item}
+                  </li>
+                ))
+              ) : (
+                <li className="fl-viewer-compare-li fl-viewer-compare-li--muted">None listed</li>
+              )}
+            </ul>
+          </div>
+          <div className={colClass}>
+            <p className={`${monoClass} fl-viewer-compare-col-label`}>Softened or absent vs A</p>
+            <ul className="fl-viewer-scroll-list">
+              {c.droppedLanguage.length ? (
+                c.droppedLanguage.map((item, i) => (
+                  <li key={i} className="fl-viewer-compare-li">
+                    {item}
+                  </li>
+                ))
+              ) : (
+                <li className="fl-viewer-compare-li fl-viewer-compare-li--muted">None listed</li>
+              )}
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
+    if (p.kind === "compare-claims" && c) {
+      return (
+        <ul className={mode === "fs" ? "fl-viewer-fs-list fl-viewer-compare-shifts" : "fl-viewer-scroll-list fl-viewer-compare-shifts"}>
+          {c.claimShifts.length ? (
+            c.claimShifts.map((item, i) => (
+              <li key={i} className="fl-viewer-compare-shift-row">
+                <span className="fl-viewer-compare-shift-badge" aria-hidden>
+                  A→B
+                </span>
+                <span className="fl-viewer-compare-shift-text">{item}</span>
+              </li>
+            ))
+          ) : (
+            <li className="fl-viewer-compare-li--muted">None listed</li>
+          )}
+        </ul>
+      );
+    }
+
+    if (p.kind === "compare-confidence" && c) {
+      const meterStyleA = { "--fl-meter": `${c.confidenceA}%` } as CSSProperties;
+      const meterStyleB = { "--fl-meter": `${c.confidenceB}%` } as CSSProperties;
+      return (
+        <div className={mode === "fs" ? "fl-viewer-compare-confidence fl-viewer-compare-confidence--fs" : "fl-viewer-compare-confidence"}>
+          <div className="fl-viewer-compare-confidence-col">
+            <p className={`${monoClass} fl-viewer-compare-col-label`}>Document A</p>
+            <div className="fl-app-meter-track fl-viewer-compare-meter">
+              <div className="fl-app-meter-fill" style={meterStyleA} />
+            </div>
+            <p className="fl-viewer-compare-pct">{c.confidenceA}%</p>
+          </div>
+          <div className="fl-viewer-compare-confidence-col">
+            <p className={`${monoClass} fl-viewer-compare-col-label`}>Document B</p>
+            <div className="fl-app-meter-track fl-viewer-compare-meter">
+              <div className="fl-app-meter-fill" style={meterStyleB} />
+            </div>
+            <p className="fl-viewer-compare-pct">{c.confidenceB}%</p>
+          </div>
+          {c.confidenceNote?.trim() ? (
+            <p className={mode === "fs" ? "fl-viewer-fs-prose fl-viewer-compare-note-full" : "fl-viewer-scroll-prose fl-viewer-compare-note-full"}>
+              {c.confidenceNote}
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+
+    if (p.kind === "compare-metrics" && c) {
+      return <p className={mode === "fs" ? "fl-viewer-fs-prose" : "fl-viewer-scroll-prose"}>{c.metricsNarrative}</p>;
     }
 
     if (!a) return null;
@@ -241,6 +392,28 @@ export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: 
     return null;
   };
 
+  if (layout === "compare" && (!compareResult || total === 0)) {
+    return (
+      <div className="fl-viewer-missing">
+        <p className="fl-viewer-missing-title">This comparison could not be displayed.</p>
+        <Link href={homeUrl} className="fl-app-nav-btn">
+          Back to FinanceLens AI
+        </Link>
+      </div>
+    );
+  }
+
+  if (total === 0) {
+    return (
+      <div className="fl-viewer-missing">
+        <p className="fl-viewer-missing-title">This deck has expired or does not exist</p>
+        <Link href={homeUrl} className="fl-app-nav-btn">
+          Back to FinanceLens AI
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="fl-viewer-root">
       <header className="fl-viewer-topbar">
@@ -260,7 +433,7 @@ export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: 
       <main className="fl-viewer-scroll">
         {panels.map((p, i) => (
           <article key={p.key} className="fl-viewer-card">
-            <p className="fl-viewer-card-num">{(layout === "briefing" ? "Slide" : "Section") + " " + (i + 1)}</p>
+            <p className="fl-viewer-card-num">{sectionLabel(layout) + " " + (i + 1)}</p>
             <h2 className="fl-viewer-card-title">{p.title}</h2>
             <div className="fl-viewer-card-body">{renderPanelBody(p, "scroll", i)}</div>
             <footer className="fl-viewer-card-footer">
@@ -307,9 +480,7 @@ export function DeckViewer({ layout, slides, analysis, expiresAtIso, homeUrl }: 
             ›
           </button>
           <div className="fl-viewer-fs-stage">
-            <p className="fl-viewer-fs-kicker">
-              {(layout === "briefing" ? "Slide" : "Section") + " " + (safeIndex + 1)}
-            </p>
+            <p className="fl-viewer-fs-kicker">{sectionLabel(layout) + " " + (safeIndex + 1)}</p>
             <h2 className="fl-viewer-fs-headline">{current.title}</h2>
             <div className="fl-viewer-fs-content">{renderPanelBody(current, "fs", safeIndex)}</div>
             <p className="fl-viewer-fs-powered">Powered by FinanceLens AI</p>

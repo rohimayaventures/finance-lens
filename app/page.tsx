@@ -89,8 +89,8 @@ export default function Home() {
                 signal: <strong>translation plus intelligence</strong>, not a flattening summary.
               </p>
               <p className="fl-lp-lede-mono">
-                Paste text or upload a PDF. Five structured sections—plain language, interpretation, key metrics, drift, and
-                flags—plus compare mode and export-ready briefing layouts.
+                Paste text or upload PDF (text extraction, not scanned pages). Five structured sections—plain language,
+                interpretation, key metrics, drift, and flags—plus compare mode and export-ready briefing layouts.
               </p>
               <div className="fl-hero-actions fl-lp-actions">
                 <Link href="/analyze" className="fl-btn-primary">
@@ -225,7 +225,9 @@ export default function Home() {
             <ol className="fl-lp-workflow-steps">
               <li className="fl-lp-workflow-step">
                 <span className="fl-lp-workflow-label">Ingest</span>
-                <span className="fl-lp-workflow-detail">Paste or PDF · pick document type</span>
+                <span className="fl-lp-workflow-detail">
+                  Paste text or upload PDF (text extraction, not scanned pages) · pick document type
+                </span>
               </li>
               <li className="fl-lp-workflow-step">
                 <span className="fl-lp-workflow-label">Analyze</span>

@@ -111,7 +111,7 @@ Open `http://localhost:3000`
 | `/api/compare` | Compare JSON |
 | `/api/briefing` | Briefing deck JSON + resolved slide images + share URL |
 | `/api/export-pdf` | Branded PDF |
-| `/api/parse-pdf` | Server PDF text (optional; analyze UI upload still uses a simple client decode — prefer paste for reliability) |
+| `/api/parse-pdf` | PDF text extraction for analyze uploads (`pdf-parse`; truncates at 15k chars) |
 
 ---
 

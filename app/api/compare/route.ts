@@ -1,11 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
 import { compareResultSchema } from "@/lib/schemas/compare";
+import { deckShareUrl } from "@/lib/publicAppUrl";
+import { getSupabase } from "@/lib/supabase";
+
+/** Vercel: allow long Claude runs (align with /api/analyze). */
+export const maxDuration = 120;
 
 type CompareBody = {
   textA?: string;
   textB?: string;
+  /** Document type for both texts (sidebar selector). */
   docType?: string;
 };
 
@@ -75,7 +82,49 @@ export async function POST(request: NextRequest) {
       schema: compareResultSchema,
     });
 
-    return NextResponse.json(normalized);
+    const shareSlug = nanoid(10);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const documentType = docType;
+    const aPart = textA.slice(0, 2500);
+    const bPart = textB.slice(0, 2500);
+    let documentText = `${aPart} | ${bPart}`;
+    if (documentText.length > 5000) {
+      documentText = documentText.slice(0, 5000);
+    }
+
+    let shareSlugOut: string | null = null;
+    let shareUrlOut: string | null = null;
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { error } = await supabase.from("financelens_sessions").insert({
+          document_type: documentType,
+          document_text: documentText,
+          analysis: normalized,
+          slides: null,
+          share_slug: shareSlug,
+          layout: "compare",
+          expires_at: expiresAt,
+        });
+        if (error) {
+          console.error("financelens_sessions insert (compare):", error);
+        } else {
+          shareSlugOut = shareSlug;
+          shareUrlOut = deckShareUrl(shareSlug);
+        }
+      } catch (err) {
+        console.error("financelens_sessions insert (compare):", err);
+      }
+    } else {
+      console.warn("financelens_sessions insert (compare): Supabase env vars missing; skipping persist.");
+    }
+
+    return NextResponse.json({
+      ...normalized,
+      shareSlug: shareSlugOut,
+      shareUrl: shareUrlOut,
+    });
   } catch {
     return NextResponse.json({ error: "Compare failed" }, { status: 500 });
   }

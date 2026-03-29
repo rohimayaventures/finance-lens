@@ -4,6 +4,13 @@ import Link from "next/link";
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useState } from "react";
 
+function clientShareBaseUrl(): string {
+  const v = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, "");
+  if (v) return v;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "https://financelens-ai.vercel.app";
+}
+
 type DocType = "earnings" | "tenk" | "regulatory";
 
 type CompareSamplePair = {
@@ -218,6 +225,8 @@ export default function ComparePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<CompareResult | null>(null);
+  const [compareShareSlug, setCompareShareSlug] = useState<string | null>(null);
+  const [compareShareCopied, setCompareShareCopied] = useState(false);
   const [activePairId, setActivePairId] = useState<string | null>(null);
 
   const loadSamplePair = (pair: CompareSamplePair) => {
@@ -227,6 +236,8 @@ export default function ComparePage() {
     setActivePairId(pair.id);
     setError("");
     setResult(null);
+    setCompareShareSlug(null);
+    setCompareShareCopied(false);
   };
 
   useEffect(() => {
@@ -240,6 +251,8 @@ export default function ComparePage() {
     setActivePairId(pair.id);
     setError("");
     setResult(null);
+    setCompareShareSlug(null);
+    setCompareShareCopied(false);
   }, []);
 
   const canSubmit = textA.trim().length > 0 && textB.trim().length > 0 && !loading;
@@ -250,22 +263,41 @@ export default function ComparePage() {
     setLoading(true);
     setError("");
     setResult(null);
+    setCompareShareSlug(null);
+    setCompareShareCopied(false);
     try {
       const res = await fetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ textA, textB, docType }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, unknown>;
       if (!res.ok) {
         setError(typeof data.error === "string" ? data.error : "Compare failed. Please try again.");
         return;
       }
-      setResult(data as CompareResult);
+      const shareSlug = data.shareSlug;
+      const rest = { ...data };
+      delete rest.shareSlug;
+      delete rest.shareUrl;
+      setResult(rest as CompareResult);
+      setCompareShareSlug(typeof shareSlug === "string" && shareSlug.length > 0 ? shareSlug : null);
     } catch {
       setError("Compare failed. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyCompareShareUrl = async () => {
+    if (!compareShareSlug) return;
+    const url = `${clientShareBaseUrl()}/deck/${compareShareSlug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCompareShareCopied(true);
+      window.setTimeout(() => setCompareShareCopied(false), 2000);
+    } catch {
+      setError("Could not copy link. Try again or copy manually.");
     }
   };
 
@@ -404,6 +436,20 @@ export default function ComparePage() {
                   <span className="fl-print-meta-note"> · Assistive analysis only; not financial advice.</span>
                 </p>
               </header>
+
+              <div className="fl-compare-share-actions">
+                <button
+                  type="button"
+                  className="fl-app-sidebar-btn fl-app-sidebar-btn--ghost"
+                  onClick={copyCompareShareUrl}
+                  disabled={!compareShareSlug}
+                >
+                  {compareShareCopied ? "Copied!" : "Share comparison →"}
+                </button>
+                {compareShareSlug === null ? (
+                  <p className="fl-compare-share-unavailable">Share unavailable -- try again</p>
+                ) : null}
+              </div>
 
               <section className="fl-app-report-section">
                 <div className="fl-app-section-head">

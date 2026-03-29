@@ -1,196 +1,229 @@
-# FinanceLens AI — Portfolio Case Study Documentation
+# FinanceLens AI — Portfolio Case Study
 # Hannah Kraulik Pagade
-# For use in portfolio at hannahkraulikpagade.com
+# hannahkraulikpagade.com
+
+**Live product:** https://financelens-ai.vercel.app
+
+**Last updated:** March 2026 (post-ship full sync)
 
 ---
 
 ## PROJECT METADATA
 
-**Project name:** FinanceLens AI
-**Tagline:** Financial documents, in plain English.
-**Status:** Live
-**Primary URL:** financelens-ai.vercel.app
-**Repo:** github.com/rohimayaventures/financelens-ai
-**Tags:** FINTECH · AI-PRODUCT · FULL-STACK · DOCUMENT-INTELLIGENCE
-**Role:** Product Design and Prompt Architecture
-**Timeline:** 2026
-**Key outcome:** Five-section financial analysis with language drift detection, confidence scoring, guardrails, and one-click Canva deck generation
-**Stack:** Next.js 15 · TypeScript · Tailwind CSS v4 · Claude API · Canva API · Supabase · Vercel
+| Field | Value |
+|-------|-------|
+| **Project name** | FinanceLens AI |
+| **Tagline** | Financial documents, in plain English. |
+| **Status** | Live |
+| **Primary URL** | https://financelens-ai.vercel.app |
+| **Repo** | https://github.com/rohimayaventures/finance-lens |
+| **Tags** | FINTECH · AI-PRODUCT · FULL-STACK · DOCUMENT-INTELLIGENCE |
+| **Role** | Product design, prompt architecture, implementation |
+| **Timeline** | 2026 |
+| **Stack** | Next.js 16 · React 19 · TypeScript · Tailwind CSS v4 · Claude API · Supabase · pdf-lib · pptxgenjs · Zod · Vercel |
 
 ---
 
 ## SECTION 1 — THE PROBLEM
 
-### One-sentence framing
+Executives write earnings calls and regulatory filings to communicate selectively. The language is deliberate. Most readers lack tools to see what the language is *signaling*, not just what it says. The shift from "we will deliver" to "we believe we are well positioned to deliver" is not a stylistic choice. It is information. FinanceLens was built to make that signal visible.
 
-Executives write earnings calls to communicate selectively. The language is deliberate. Most people reading these documents — employees, retail investors, journalists, non-finance professionals — lack the tools to read what the language is actually signaling beneath the surface.
+The secondary problem is workflow friction. Analysts and operators who do read these documents carefully lose hours turning a read-through into something shareable. A meeting-ready PDF. A deck for a client. A comparison of two filings. FinanceLens closes that loop without requiring institutional tooling or a Bloomberg terminal.
 
-### The problem in detail
-
-**Financial documents are written to obscure as much as they communicate.** A 10-K annual filing averages 40,000 words. An earnings call transcript runs 8,000 to 12,000 words. These documents are produced by teams of lawyers, investor relations professionals, and communications staff whose job is to present information in the most favorable light legally permissible. The result is a document that technically discloses everything and practically communicates very little.
-
-**The signals that matter are in the language, not just the numbers.** "We believe we are well-positioned to deliver" is not the same as "we are confident we will deliver." When a CFO says "we are evaluating our cost structure," that phrase appears in the earnings calls of companies that announce restructurings within two quarters at a statistically significant rate. When guidance range width increases from $100M to $150M while the midpoint holds, management is signaling higher uncertainty than the headline number implies. These are readable signals — if you know what to look for.
-
-**Most people do not know what to look for.** Financial literacy tools either summarize the document and lose the signal, or present it raw and require expertise the user does not have. No tool exists that surfaces drift between definitive and hedging language, scores individual management claims by whether they are backed by metrics or are pure assertion, flags buried disclosures, and compares language shift across two documents — all in plain English, in one interface.
-
-**The analyst workflow is broken.** An analyst or investor who wants to turn a 10-K analysis into a presentation for a board or investment committee currently reads the document, takes notes, writes a summary, and builds slides manually. That is three to four hours of work for every document. None of it needs to be manual.
-
-### Why existing solutions fall short
-
-Financial data platforms such as Bloomberg, FactSet, and Refinitiv are priced for institutional users and focused on structured data, not natural language analysis. AI summarization tools produce a single paragraph that flattens the nuance. No tool combines plain language translation, drift detection, confidence scoring, and presentation generation in a single workflow accessible to a non-institutional user.
+**The gap in the market:** No accessible tool combines plain-language translation, language drift detection, confidence scoring, two-document comparison, and shareable presentation generation in a single workflow for non-institutional users.
 
 ---
 
 ## SECTION 2 — THE PROCESS
 
-### Step 1 — Discovery and Constraints
+### The core design insight
 
-**The core insight that shaped the product.**
+The difference between FinanceLens and a document summarizer is the difference between translation and intelligence. Translation removes complexity. Intelligence reveals the complexity beneath deliberately simple language. Every product decision was made in service of that distinction.
 
-The difference between FinanceLens and a document summarizer is the difference between translation and intelligence. Translation removes complexity. Intelligence reveals the complexity beneath deliberately simple language. FinanceLens was designed to do the latter.
-
-**Constraint set:**
+### Constraint set
 
 - The tool must produce more than a summary. A summary tells you what was said. FinanceLens must tell you what it means, what it signals, and what deserves scrutiny.
-- Language drift must be surfaced as a discrete signal, not buried in prose. The shift from "we will" to "we believe" must be visible at a glance.
-- Confidence scoring must apply to individual claims, not the document as a whole. A document can contain both verifiable metrics and unsubstantiated assertions in the same paragraph.
-- The document type must change the analysis logic. An earnings call is analyzed for management tone, guidance language, and selective disclosure. A 10-K is analyzed for auditor changes, revenue concentration risk, forward-looking statement density, and risk factor additions. A regulatory notice is analyzed for compliance obligations and enforcement language. The same prompt cannot serve all three.
-- The output must be shareable without friction. One-click Canva deck generation was a product requirement from the start, not a feature added later.
-- Guardrails must be explicit and persistent. Financial intelligence in a regulated-adjacent domain carries hallucination risk and real liability surface. The tool must never present itself as a financial advisor and must frame every output as assistive analysis, not authoritative conclusion.
+- Language drift must be surfaced as a discrete signal, not buried in prose. The shift from firm to hedging language must be visible at a glance, with the actual phrases quoted.
+- Confidence scoring must reflect evidence density in the excerpt, not a statistical prediction or investment recommendation. That distinction must be made explicit in the UI and in a dedicated methodology page.
+- The document type must change the analysis logic. An earnings call is analyzed for management tone, guidance language, and selective disclosure. A 10-K is analyzed for auditor changes, revenue concentration risk, and forward-looking statement density. A regulatory notice is analyzed for compliance obligations and enforcement language. The same prompt cannot serve all three.
+- The output must be shareable without friction. Analysis is only as useful as the person who receives it.
+- Guardrails must be explicit and persistent. The tool must never present itself as a financial advisor and must frame every output as assistive analysis, not authoritative conclusion.
 
-**Technical constraints:**
+### Technical constraints and a key pivot
 
-- Claude API selected for structured JSON output reliability across all five sections simultaneously
-- Canva API selected for presentation generation — branded, shareable, editable by the recipient
-- Supabase for share URL generation — analysis history accessible without requiring user authentication
-- Next.js 15 App Router for the split sidebar and main content layout
+The original architecture specified the Canva Connect API for branded presentation generation. During build, Canva's app review process blocked programmatic access for portfolio tools pending approval. Rather than wait on a third-party approval timeline, the architecture was redesigned to own the full presentation layer.
 
-### Step 2 — Design and Build
+The replacement approach: Claude builds a structured 7-slide JSON outline from the analysis, the server resolves images via Unsplash (with attribution) or Pollinations as a fallback, and the client generates a real `.pptx` file using pptxgenjs as a blob download. Simultaneously, the slide JSON is persisted to Supabase and returned as a shareable URL at `/deck/[slug]` -- a full-screen branded presenter view built inside the app using the WSJ Editorial design system.
 
-**Prompt architecture — the hardest problem.**
+The result is architecturally stronger than the original spec. No third-party OAuth dependency. No approval process. The presentation layer is entirely owned, entirely branded, and works for any public user without authentication. Canva API integration remains on the product roadmap for a future release that adds editable deck output.
 
-The core technical challenge was building a prompt that produces five structurally distinct sections from a single document input, with the analysis logic varying by document type, without the sections bleeding into each other or losing their distinct purpose.
-
-Key prompt constraints iterated through testing:
-
-- Section 1 (What they said) must not interpret. It must translate. Any interpretive language belongs in Section 2. The test: could a communications team have written Section 1 themselves? If yes, it is clean. If not, it contains interpretation and needs revision.
-- Section 2 (What it actually means) must remove hedging from management claims and state what the language implies directly. Not "the company noted challenges" but "revenue in this segment declined and management avoided specifying by how much."
-- Section 3 (Key numbers) must return numbers with direction, context, and comparison. Not "$847M" but "$847M, up 12% year-over-year, driven by enterprise — consumer revenue was not disclosed."
-- Section 4 (Language drift) must identify specific phrases and their shift from prior language where detectable, or flag them as hedging versus definitive language patterns. Each drift item returns as a tagged object: hedge, firm, or new language.
-- Section 5 (Worth a closer look) must flag items that are structurally suspicious — buried disclosures, missing figures, language patterns associated with subsequent negative events — with a claim confidence score at the section level.
-- All sections must use attribution language throughout: "this may suggest," "this is consistent with," "this language pattern is typically associated with." The system prompt explicitly prohibits any language a reasonable person could interpret as a buy, sell, or hold recommendation. The model is constrained to observe and interpret, not to advise or predict.
-
-**Document type selector — three separate prompt variants.**
-
-Earnings call analysis focuses on: guidance language, management tone shifts, selective disclosure by segment, question-and-answer evasion patterns, and forward-looking statement confidence.
-
-10-K analysis focuses on: auditor changes, revenue concentration (single customer or geography risk), risk factor additions or deletions versus prior year, going concern language, and related party transaction disclosure.
-
-Regulatory notice analysis focuses on: compliance obligation specificity, enforcement language intensity, timeline requirements, and penalty exposure framing.
-
-**Compare mode — the feature that makes FinanceLens an intelligence tool.**
-
-Two documents are analyzed independently, then Claude performs a third pass comparing the outputs. The comparison surfaces: new language that appeared, language that was dropped, confidence score shifts between periods, and specific claims that changed from firm to hedging or vice versa. For a Q3 versus Q4 comparison, this tells you what management stopped saying.
-
-**Canva deck generation — the workflow completion.**
-
-After analysis, Claude structures the five sections into seven slide outlines: title, executive summary, interpretation, key metrics, language drift signals, flags, and source reference. The Canva API generates a branded presentation from those outlines using the user's brand kit. The result is an editable, shareable Canva link — not a static PDF, but a live presentation the recipient can modify.
-
-**Design system — WSJ Editorial.**
+### Design system -- WSJ Editorial
 
 FinanceLens is the only light-background product in the portfolio. The WSJ Editorial system was designed to read like a financial newspaper crossed with an analyst research report.
 
-- Background: warm cream `#FAFAF7`
-- Primary text: deep ink `#1C1C1E`
-- Signal red for flags and negative indicators: `#C0392B`
-- Positive indicators: `#1A7A3C`
-- Drift hedge signal: amber `#9A6B00`
-- Drift firm signal: forest `#1A7A3C`
-- Typography: Georgia (headings and product name), IBM Plex Mono (all financial data, tags, and metadata)
+| Token | Value | Usage |
+|-------|-------|-------|
+| Background | `#FAFAF7` warm cream | All surfaces |
+| Primary text | `#1C1C1E` deep ink | Body, headings |
+| Signal red | `#C0392B` | Flags, negative indicators, logo accent |
+| Positive | `#1A7A3C` forest | Upward metrics, firm language |
+| Hedge amber | `#9A6B00` | Drift hedge signals |
+| Typography | Georgia + IBM Plex Mono | Headings/wordmark + all financial data and tags |
 
-The deliberate choice to use a light background and serif typography makes FinanceLens immediately visually distinct from every other product in the portfolio and communicates the editorial, research-report register of the product before a word is read.
-
-### Step 3 — What Shipped
-
-**Core product:**
-- Document input via paste or PDF upload with server-side PDF parsing
-- Document type selector with three distinct Claude analysis prompts: earnings call, 10-K, regulatory notice
-- Five-section structured analysis output rendered in the WSJ Editorial design system
-- Language drift detection with hedge versus firm tagging and specific phrase-level examples
-- Claim confidence scoring at the section and document level
-- Compare mode: two-document diff showing language changes, dropped content, and confidence shifts
-- Generate Canva deck: one-click conversion of analysis to branded, editable presentation via Canva API
-- Share URL generation via Supabase for analysis history and collaboration
-- Persistent disclaimer on all analysis output: assistive analysis only, not financial advice
-
-**Technical stack:**
-- Next.js 15 App Router, TypeScript, Tailwind CSS v4
-- Claude API (claude-sonnet-4-20250514) with three document-type-specific system prompts
-- Canva API for branded presentation generation
-- Supabase for session persistence and share URLs
-- Vercel deployment
+The deliberate choice to use a light background and serif typography makes FinanceLens immediately visually distinct from every other product in the portfolio and communicates the editorial, research-report register before a word is read.
 
 ---
 
-## SECTION 3 — OUTCOMES AND IMPACT
+## SECTION 3 — WHAT SHIPPED
 
-### What this demonstrates as a portfolio project
+### Single-document analysis (`/analyze` → `/results`)
 
-**Generalist AI product thinking.** FinanceLens applies the same AI document intelligence architecture as HealthLiteracy AI to a completely different domain and user type. The pattern — structured document input, constrained Claude prompt, typed output sections — generalizes. A product builder who can apply a proven architecture to a new domain efficiently is more valuable than one who rebuilds from scratch every time.
+**Input:** Paste text or upload PDF (text extraction via `/api/parse-pdf`, not OCR -- scanned pages require paste).
 
-**Prompt architecture sophistication.** Five distinct output sections from a single document pass, with analysis logic branching by document type and a separate comparison pass for two-document mode, requires multi-layer prompt design. This is not a summarizer. It is a constrained intelligence pipeline.
+**Document types:** Earnings call, 10-K, regulatory notice. Each type steers a different Claude system prompt covering tone, risk framing, and compliance language.
 
-**End-to-end workflow thinking.** The Canva integration is not a feature added for novelty. It completes the analyst workflow: ingest a document, analyze it, present it. Most AI tools stop at analysis and leave the presentation problem to the user. FinanceLens closes the loop.
+**Output sections:**
 
-**Design system range.** WSJ Editorial is the only light-background, serif-led design system in the portfolio. It demonstrates range across the full spectrum — from the clinical authority of Meridian Oracle to the accessibility warmth of Candlelight Clarity to the institutional editorial register of WSJ Editorial.
+1. **What they said** -- plain-language translation with no interpretation. Clean enough that a communications team could have written it.
+2. **What it actually means** -- interpretation with hedging removed. Not "the company noted challenges" but "revenue in this segment declined and management avoided specifying by how much."
+3. **Key numbers** -- values with labels, direction of change, and context.
+4. **Language drift** -- `hedge` vs `firm` tags with quoted phrases from the document. The shift is the signal.
+5. **Worth a closer look** -- flags with evidence-oriented copy, not opinions.
+6. **Source anchors** -- short excerpts tied to the user's paste, supporting each interpretive claim.
 
-**Domain breadth without domain depth compromise.** FinanceLens works because the core insight — that financial language is structured and its drift patterns are detectable — is accurate. Building a financial intelligence tool requires understanding how earnings calls are constructed, what regulatory language signals, and which 10-K disclosures carry risk. The product reflects that understanding.
+**Confidence score:** LLM-assigned 0-100 rubric on evidence density in the excerpt. Not a statistical prediction. Not a stock recommendation. The methodology page explains this explicitly. Toggle on/off.
 
-### Guardrails and limitations
+**Speed:** Haiku on by default for latency. Sonnet available for deeper passes.
 
-FinanceLens is an assistive analysis tool, not a financial advisor. This distinction is not a legal footnote — it is a product design decision that shapes every layer of the build.
-
-The system prompt explicitly prohibits any language a reasonable person could interpret as a buy, sell, or hold recommendation. Every section uses attribution framing throughout: "this may suggest," "this is consistent with," "this language pattern is typically associated with." The model is constrained to observe and interpret, not to advise or predict.
-
-Every analysis page carries a persistent disclaimer: outputs are AI-generated interpretations for informational purposes only, not investment advice, and users are responsible for their own financial decisions.
-
-This framing is intentional and mirrors the same safety-first prompt architecture used in OrixLink AI — the attribution language constraint that prevents the tool from being read as authoritative rather than assistive. Building explicit guardrails into the prompt architecture for a regulated-adjacent domain is a product maturity signal. It shows understanding of the liability surface of AI products and the difference between a useful tool and a reckless one. In interviews, the guardrail architecture is a more interesting talking point than the feature list.
+**Persistence:** Results in sessionStorage for the tab session. Share analysis saves to Supabase and returns a durable **share URL** at `/deck/[slug]` (**30-day TTL**, with expiry called out in the viewer).
 
 ---
 
-## SECTION 4 — PORTFOLIO PAGE COPY (READY TO DROP IN)
+### Compare mode (`/compare`)
 
-### Status badge
-Live
+Two documents, same doc-type framing. One Claude call returns structured JSON:
 
-### Role and timeline
-Product Design and Prompt Architecture · 2026
+- Overview of the period-over-period shift
+- New language that appeared in Document B
+- Language that was dropped from Document A
+- Claim shifts with direction indicators (firm to hedge or reverse)
+- Metrics narrative
+- Dual confidence scores side by side
+
+Six built-in sample pairs (earnings, 10-K, regulatory, retail Y/Y, cyber 10-K, Wells Fargo settlement) for instant demos.
+
+Share comparison saves to Supabase and returns a `/deck/[slug]` URL with a compare-specific layout in DeckViewer showing A/B column structure.
+
+`maxDuration: 120` on the route prevents Vercel timeout on long paired pastes.
+
+---
+
+### Briefing deck (from results)
+
+Claude builds a 7-slide JSON outline. Server resolves images:
+
+- Unsplash Access Key set: `imageSearchQuery` → Unsplash landscape search with attribution and download ping per guidelines.
+- Fallback: `imagePrompt` → Pollinations URL for abstract imagery.
+
+UI: Modal preview → Download PowerPoint (`.pptx` via pptxgenjs, blob download after async image fetch) → Share deck (copies `/deck/[slug]` to clipboard) → Open full-screen slides.
+
+---
+
+### Shareable deck viewer (`/deck/[slug]`)
+
+Any analysis, briefing deck, or comparison saved to Supabase is accessible at a **share URL** (**30-day TTL** — not indefinite storage). No login required. Works for any public user with the link.
+
+**Scroll view (default):** Full-width WSJ Editorial cards, one per slide. Generous padding. Georgia headings, IBM Plex Mono for data. "Powered by FinanceLens AI" footer on every card. Expiry date shown at top.
+
+**Full-screen view (toggle):** Fixed overlay, one slide at a time, keyboard arrow navigation, slide counter, ESC to exit. Same WSJ Editorial palette on a near-black background.
+
+Expired or missing slugs show a clean branded error state with a link back to the app.
+
+---
+
+### Share as PDF (`/api/export-pdf`)
+
+Branded PDF via pdf-lib (Node runtime): FinanceLens wordmark, red rule, WSJ Editorial token colors, all report sections with footers and disclaimer. Triggered from the results sidebar.
+
+---
+
+### Methodology and trust layer (`/methodology`)
+
+Dedicated page explaining: how Claude is used, what confidence scores mean, how deck images are sourced, JSON validation and retry logic, sessionStorage scope, and the assistive-only disclaimer. In-product hints on results and compare pages reinforce this framing at point of use.
+
+---
+
+### Validation layer
+
+All analyze, compare, and briefing routes use `claudeJsonWithRetry` in `lib/claudeJsonWithRetry.ts`: one repair turn if JSON is invalid or fails Zod schema validation. Reduces silent empty failures from malformed model output.
+
+---
+
+## SECTION 4 — TECHNICAL ARCHITECTURE
+
+| Piece | Implementation |
+|-------|----------------|
+| Framework | Next.js 16 App Router |
+| AI | Anthropic SDK, `claude-sonnet-4-20250514` (analyze/compare/briefing), `claude-3-5-haiku-20241022` default for fast analyze |
+| Validation | Zod schemas + `lib/claudeJsonWithRetry.ts` |
+| Persistence | Supabase (`financelens_sessions` table, shared with HealthLiteracy AI project) |
+| Deck file | pptxgenjs (browser, blob download) |
+| PDF | pdf-lib (`/api/export-pdf`, nodejs, `maxDuration` 60s) |
+| PDF parsing | pdf-parse (`/api/parse-pdf`, wired to analyze upload path) |
+| Images | Unsplash API + Pollinations fallback |
+| Env | `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_APP_URL` (canonical base for `/deck/[slug]` share links in email and social), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, optional `UNSPLASH_ACCESS_KEY`, optional `ANTHROPIC_ANALYZE_*` tuning |
+| Deploy | Vercel; analyze and compare routes `maxDuration: 120s` |
+
+**Routes:** `/`, `/analyze`, `/results`, `/compare`, `/deck/[slug]`, `/methodology`, `/api/analyze`, `/api/compare`, `/api/briefing`, `/api/export-pdf`, `/api/parse-pdf`.
+
+**Supabase table:** `financelens_sessions` -- columns: `id`, `document_type`, `document_text`, `analysis`, `slides`, `share_slug` (unique), `layout` (`briefing` for single-doc analysis + briefing decks, `compare` for compare mode), `created_at`, `expires_at` (30-day TTL). Public read by slug. Public insert. No auth required. Row Level Security enabled.
+
+---
+
+## SECTION 5 — STATUS MATRIX
+
+### What works
+
+- Paste → analyze → results with typed JSON, guardrail phrasing, drift, source anchors, confidence meter, optional fast model
+- PDF upload via server-side pdf-parse with extracted text preview and truncation notice
+- Compare for two pasted texts with clear A/B framing, claim shifts, sample pairs, share URL, and `maxDuration` protection
+- Briefing modal with slide outline, PPTX download, share deck copy-to-clipboard, and full-screen deck via `/deck/[slug]`
+- `/deck/[slug]` scroll + full-screen presenter view for both briefing and compare layouts
+- Branded PDF export from results with consistent FinanceLens identity
+- Methodology page and in-product hints on confidence and evidence framing
+- Schema and retry logic reduces brittle empty failures from malformed model JSON
+- Graceful degradation -- if Supabase insert fails, PPTX download still works offline
+- Build hygiene -- `getSupabase()` guard prevents build crashes without Supabase env
+
+### Known gaps and roadmap
+
+- **Canva API integration** (roadmap): Canva Connect API app approval is pending. When approved, the briefing flow will add a "Polish in Canva" path that produces an editable, branded Canva design alongside the existing PPTX download and **30-day** `/deck/[slug]` share links. A manual "Open in Canva" link exists in the current UI as a bridge.
+- **Scanned PDF support:** `/api/parse-pdf` uses pdf-parse for text-layer extraction only. Scanned image PDFs require paste. Copy in the UI reflects this accurately.
+- **Streaming:** Analyze waits for full JSON response. A streaming status UI ("Analyzing language drift... Scoring confidence...") is a planned UX improvement.
+- **Rate limiting:** Not implemented on API routes. Appropriate before any public traffic push.
+- **Observability:** No structured logging for latency, token use, or failure class distribution. Needed before any monetization layer.
+- **Confidence calibration:** Scores are useful as a rough rubric. Not calibrated across models or document types. Clearer UI copy and optional hiding available now.
+
+---
+
+## SECTION 6 — PORTFOLIO COPY
 
 ### Key outcome
-Five-section financial intelligence with language drift detection, claim confidence scoring, and one-click Canva deck generation
+
+Structured financial intelligence -- plain language, drift detection, source anchors, confidence rubric -- across single-document analysis and two-document comparison, with branded PDF share, LLM-built briefing decks with Unsplash imagery, PPTX download, full-screen presenter view at a **30-day share URL** (`/deck/[slug]`), and an explicit methodology and trust layer. Assistive only. Never financial advice.
 
 ### Card summary
-Financial document intelligence. Earnings calls, 10-Ks, regulatory notices. Drift detection, confidence scoring, one-click decks.
 
-### Project description (for case study hero)
-FinanceLens AI translates earnings calls, 10-K filings, and regulatory notices into five structured intelligence sections — plain language, interpretation, key numbers, language drift signals, and flags worth a closer look. Compare two documents side by side to see what changed. Generate a Canva presentation deck in one click. Assistive analysis only, not financial advice.
+Earnings calls, 10-Ks, and regulatory filings → structured analysis, two-document compare, shareable PDF, and exportable slides -- with explicit trust framing and a validated JSON pipeline from document to shareable artifact.
 
-### Problem statement (for case study hero)
-Executives write earnings calls to communicate selectively. The language is deliberate. "We believe we are well-positioned" is not the same as "we are confident we will deliver." Most people reading these documents lack the tools to read what the language is actually signaling. FinanceLens surfaces those signals.
+### One honest line for interviews
 
-### Process Step 1 — Discovery
-The core constraint was the difference between translation and intelligence. Translation removes complexity. Intelligence reveals the complexity beneath deliberately simple language. Every design decision — the five-section structure, the drift detection, the document type selector, the explicit guardrails, the Canva integration — follows from that distinction.
+FinanceLens closes the loop from financial document to shareable artifact using Claude, Zod validation, pdf-lib, pptxgenjs, and Supabase-backed **30-day share URLs** -- not a thin summarizer, and every architectural decision in the case study matches what is actually wired in the repo.
 
-### Process Step 2 — Design and Build
-The core product work was a multi-layer Claude prompt architecture producing five structurally distinct output sections with analysis logic that varies by document type. An earnings call is analyzed for guidance language and management tone. A 10-K is analyzed for auditor changes, revenue concentration, and risk factor shifts. A regulatory notice is analyzed for compliance obligations and enforcement language. The compare mode runs a third Claude pass that diffs two analyses and surfaces what changed, what was dropped, and how confidence shifted. Every output section uses attribution language throughout — the same constraint architecture that prevents OrixLink from functioning as a diagnostic instrument applies here to prevent FinanceLens from functioning as a financial advisor.
+### The pivot story (for PM interviews)
 
-### Process Step 3 — What shipped
-A financial document intelligence tool with three document type modes, five structured output sections, language drift detection with phrase-level tagging, claim confidence scoring, two-document compare mode, one-click Canva presentation generation, and persistent assistive-only disclaimers throughout. Deployed on Vercel, sessions persisted in Supabase, built on Next.js 15 and the Claude and Canva APIs.
-
-### Impact line
-Three to four hours of analyst work — read the document, take notes, write a summary, build slides — replaced by one workflow. Ingest, analyze, present. That is the product. And it is honest about what it is: an assistive intelligence layer, not a financial advisor.
+The original spec called for Canva Connect API as the presentation output. During build, Canva's app review process blocked access pending approval -- a real-world constraint with no timeline. Rather than stall the ship, the architecture was redesigned to own the presentation layer entirely: Claude JSON outlines, pptxgenjs for the file download, and a custom `/deck/[slug]` viewer built inside the app using the WSJ Editorial design system. The result removed a third-party OAuth dependency, gave full control over the branded output, and shipped faster. Canva API remains on the roadmap as an additive feature, not a requirement for the core workflow to function.
 
 ---
 
-*Case study documentation prepared March 2026.*
-*Hannah Kraulik Pagade.*
+*FinanceLens AI — https://financelens-ai.vercel.app · Case study reflects [github.com/rohimayaventures/finance-lens](https://github.com/rohimayaventures/finance-lens) as of March 2026.*
