@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -432,6 +433,10 @@ export default function AnalyzePage() {
           </form>
         </main>
       </div>
+
+      <footer className="fl-app-shell-foot" role="contentinfo">
+        <PortfolioSiteCredit className="fl-footer-portfolio-link" />
+      </footer>
     </div>
   );
 }

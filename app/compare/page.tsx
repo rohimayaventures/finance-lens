@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 import type { CSSProperties, FormEvent } from "react";
 import { useEffect, useState } from "react";
 
@@ -506,13 +507,16 @@ export default function ComparePage() {
               <div className="fl-app-disclaimer">
                 <p>
                   Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output.
-                  FinanceLens AI · hannahkraulikpagade.com
                 </p>
               </div>
             </article>
           ) : null}
         </main>
       </div>
+
+      <footer className="fl-app-shell-foot" role="contentinfo">
+        <PortfolioSiteCredit className="fl-footer-portfolio-link" />
+      </footer>
     </div>
   );
 }

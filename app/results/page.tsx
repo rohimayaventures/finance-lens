@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 import type { BriefingDeckPayload } from "@/lib/briefingTypes";
 import { downloadBriefingPptx } from "@/lib/briefingExport";
 
@@ -552,8 +553,6 @@ export default function ResultsPage() {
               <p>
                 Assistive analysis only. Not financial advice. Do not make investment decisions based solely on this output.{" "}
                 <Link href="/methodology">How FinanceLens works</Link>
-                <br />
-                FinanceLens AI · hannahkraulikpagade.com
               </p>
             </div>
           </article>
@@ -638,6 +637,10 @@ export default function ResultsPage() {
           </div>
         </div>
       ) : null}
+
+      <footer className="fl-app-shell-foot" role="contentinfo">
+        <PortfolioSiteCredit className="fl-footer-portfolio-link" />
+      </footer>
     </div>
   );
 }

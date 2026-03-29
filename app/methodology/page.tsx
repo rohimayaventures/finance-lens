@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 
 export const metadata: Metadata = {
   title: "Methodology",
@@ -105,6 +106,10 @@ export default function MethodologyPage() {
           </p>
         </article>
       </main>
+
+      <footer className="fl-app-shell-foot" role="contentinfo">
+        <PortfolioSiteCredit className="fl-footer-portfolio-link" />
+      </footer>
     </div>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 
 export default function Home() {
   const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
@@ -19,7 +21,16 @@ export default function Home() {
       </div>
 
       <nav className="fl-nav" aria-label="Primary">
-        <Link href="/" className="fl-logo fl-logo--display">
+        <Link href="/" className="fl-logo fl-logo--display fl-logo--with-mark">
+          <Image
+            src="/finance-lens-mark.png"
+            alt=""
+            width={40}
+            height={40}
+            className="fl-logo-mark"
+            priority
+            aria-hidden
+          />
           Finance<span>Lens</span>
         </Link>
         <div className="fl-nav-links">
@@ -103,8 +114,20 @@ export default function Home() {
               </div>
             </div>
 
-            <aside className="fl-lp-aside" aria-label="Example signals">
-              <div className="fl-lp-aside-frame">
+            <div className="fl-lp-hero-right">
+              <div className="fl-lp-hero-visual">
+                <Image
+                  src="/hero.webp"
+                  alt="FinanceLens AI — structured analysis of filings and earnings calls"
+                  width={1200}
+                  height={630}
+                  className="fl-lp-hero-img"
+                  priority
+                  sizes="(max-width: 900px) 100vw, min(480px, 42vw)"
+                />
+              </div>
+              <aside className="fl-lp-aside" aria-label="Example signals">
+                <div className="fl-lp-aside-frame">
                 <p className="fl-lp-aside-label">Live signal stack</p>
                 <div className="fl-lp-signals">
                   <div className="fl-lp-signal">
@@ -128,8 +151,9 @@ export default function Home() {
                 </div>
                 <div className="fl-lp-aside-corner fl-lp-aside-corner--tl" aria-hidden />
                 <div className="fl-lp-aside-corner fl-lp-aside-corner--br" aria-hidden />
-              </div>
-            </aside>
+                </div>
+              </aside>
+            </div>
           </div>
         </header>
 
@@ -258,7 +282,9 @@ export default function Home() {
         </section>
 
         <footer className="fl-lp-footer">
-          <span className="fl-lp-footer-left">FinanceLens AI · hannahkraulikpagade.com</span>
+          <span className="fl-lp-footer-left">
+            FinanceLens AI · <PortfolioSiteCredit className="fl-footer-portfolio-link" />
+          </span>
           <span className="fl-lp-footer-disc">
             <Link href="/methodology">Methodology</Link>
             <span aria-hidden className="fl-lp-footer-sep">

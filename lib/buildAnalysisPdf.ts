@@ -291,7 +291,7 @@ export async function buildAnalysisPdfBytes(payload: PdfAnalysisPayload): Promis
   const disc = [
     "This report was produced by FinanceLens AI for informational purposes only. It is not investment, legal, or accounting advice.",
     "Do not make investment decisions based solely on this output. Verify all material points against primary documents.",
-    "hannahkraulikpagade.com",
+    "www.hannahkraulikpagade.com",
   ];
   for (const d of disc) {
     drawLines(ctx, wrapToWidth(d, font, 8, CONTENT_W), 8, GRAY, 11);

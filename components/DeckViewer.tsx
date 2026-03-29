@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { BriefingSlide } from "@/lib/briefingTypes";
 import type { CompareResultValidated } from "@/lib/schemas/compare";
@@ -450,6 +451,9 @@ export function DeckViewer({
         <p className="fl-viewer-disclaimer">
           Assistive analysis only; not financial advice.{" "}
           <Link href={`${homeUrl}/methodology`}>How FinanceLens works</Link>
+        </p>
+        <p className="fl-viewer-portfolio">
+          <PortfolioSiteCredit className="fl-footer-portfolio-link" />
         </p>
       </footer>
 

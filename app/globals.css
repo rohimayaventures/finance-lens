@@ -112,6 +112,49 @@ body {
 
 .fl-logo span { color: var(--red); }
 
+.fl-logo.fl-logo--with-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.fl-logo-mark {
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
+  display: block;
+}
+
+.fl-footer-portfolio-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(94, 94, 99, 0.35);
+  text-underline-offset: 3px;
+}
+
+.fl-footer-portfolio-link:hover {
+  text-decoration-color: var(--red);
+  color: var(--ink);
+}
+
+.fl-app-shell-foot {
+  padding: 16px max(24px, env(safe-area-inset-right)) 28px max(24px, env(safe-area-inset-left));
+  border-top: 1px solid var(--gray-2);
+  background: var(--cream);
+  text-align: center;
+}
+
+.fl-app-shell-foot .fl-footer-portfolio-link {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--gray-4);
+  text-decoration: none;
+}
+
+.fl-app-shell-foot .fl-footer-portfolio-link:hover {
+  color: var(--red);
+}
+
 .fl-nav-links {
   display: flex;
   align-items: center;
@@ -446,6 +489,31 @@ header[id] {
 
 .fl-lp-hero-copy {
   min-width: 0;
+}
+
+.fl-lp-hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vw, 36px);
+  min-width: 0;
+}
+
+.fl-lp-hero-visual {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(28, 28, 30, 0.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75) inset,
+    0 20px 48px rgba(28, 28, 30, 0.08);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.fl-lp-hero-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  vertical-align: middle;
 }
 
 .fl-lp-kicker-row {
@@ -1972,6 +2040,20 @@ header[id] {
   margin: 0;
 }
 
+.fl-app-disclaimer .fl-footer-portfolio-link {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--gray-5);
+  text-decoration: underline;
+  text-decoration-color: rgba(94, 94, 99, 0.35);
+  text-underline-offset: 2px;
+}
+
+.fl-app-disclaimer .fl-footer-portfolio-link:hover {
+  color: var(--red);
+  text-decoration-color: var(--red);
+}
+
 /* Modal */
 .fl-app-modal-backdrop {
   position: fixed;
@@ -3407,6 +3489,24 @@ header[id] {
 }
 
 .fl-viewer-disclaimer a:hover {
+  color: var(--red);
+}
+
+.fl-viewer-portfolio {
+  margin: 10px auto 0;
+  max-width: 40rem;
+  text-align: center;
+}
+
+.fl-viewer-portfolio .fl-footer-portfolio-link {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--gray-4);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+.fl-viewer-portfolio .fl-footer-portfolio-link:hover {
   color: var(--red);
 }
 
