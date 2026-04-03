@@ -106,7 +106,9 @@ FinanceLens is the only light-background product in the portfolio. The WSJ Edito
 | Signal red | `#C0392B` | Flags, negative indicators, logo accent |
 | Positive | `#1A7A3C` forest | Upward metrics, firm language |
 | Hedge amber | `#9A6B00` | Drift hedge signals |
-| Typography | Georgia + IBM Plex Mono | Headings/wordmark + financial data and tags |
+| Typography (display) | Fraunces | Marketing headings, landing page, editorial display |
+| Typography (app) | Georgia | Report surfaces, body content, card headings |
+| Typography (data) | IBM Plex Mono | Financial data, tags, wordmark, labels |
 
 The choice to use a light background and serif typography makes FinanceLens immediately visually distinct from every other product in the portfolio and communicates the editorial, research-report register before a word is read.
 
@@ -116,7 +118,7 @@ Briefing decks include imagery resolved server-side. The pipeline: `imageSearchQ
 
 ### Compare mode architecture
 
-Two-document compare loads both transcripts and runs a diff-aware version of the analysis. The system prompt for compare mode instructs Claude to surface deltas: what was said in document A that was not said in document B, where language changed in tone or specificity, and what the shift may signal. The output renders as a side-by-side structure with delta cards highlighting the most significant changes.
+Two-document compare loads both transcripts and runs a diff-aware version of the analysis. The system prompt instructs Claude to surface deltas: what was said in document A that was not said in document B, where language changed in tone or specificity, and what the shift may signal. The output renders as an accordion-style expandable section layout. Claim shifts and new language are expanded by default. All other delta sections are collapsible. Each section header shows a summary line and item count when collapsed so reviewers can scan before expanding.
 
 ### The pivot story: Canva API to owned presentation layer
 
@@ -126,11 +128,43 @@ During build, Canva's app review process blocked API access pending approval wit
 
 The architecture was redesigned from the ground up.
 
-Instead of delegating the presentation layer to Canva, FinanceLens owns it entirely. Claude generates a structured JSON deck outline. pptxgenjs renders a downloadable PPTX from that outline. pdf-lib generates a branded PDF for sharing. A custom deck viewer at `/deck/[slug]` renders the full presentation inside the app using the WSJ Editorial design system, at a permanent Supabase-backed URL.
+Instead of delegating the presentation layer to Canva, FinanceLens owns it entirely. Claude generates a structured JSON deck outline. pptxgenjs renders a downloadable PPTX from that outline. pdf-lib generates a branded PDF for sharing. A custom deck viewer at `/deck/[slug]` renders the full presentation inside the app using the WSJ Editorial design system, at a 30-day Supabase-backed URL.
 
 The result removed a third-party OAuth dependency, gave full control over the branded output format, and shipped faster than waiting for Canva approval would have allowed. The Canva integration remains on the roadmap as an additive output format, not a requirement for the core workflow to function.
 
 **Lesson:** A third-party dependency on a feature that is not yet approved is a schedule risk that will materialize. Owning the layer eliminates the risk and often produces a better product. The custom deck viewer built for this pivot is a stronger portfolio artifact than a Canva embed would have been.
+
+### Pivot B — Hero assets to production media pipeline
+
+The landing page originally used multi-megabyte PNG and SVG exports dropped directly from design tools. These assets hurt LCP, inflated git history, and created fragile favicon behavior across email clients and social crawlers.
+
+The decision: introduce a dedicated optimization path. `scripts/optimize-assets.mjs` uses Sharp to produce `public/hero.webp` for the landing hero, `public/og-image.jpg` for Open Graph and Twitter, and rasterized mark icons at every required size (`public/icon-*.png`, `app/icon.png`, `app/apple-icon.png`). Edge cases including same-file read/write on Windows and regenerating from fallback sources when full-res inputs are absent are handled in the script, not in the UI.
+
+**Lesson:** Shipping design exports as-is confuses design handoff with production delivery. Media is a build artifact with defined outputs, not whatever the design tool exported last.
+
+### Pivot C — Metadata and portfolio attribution as shipping criteria
+
+A live product on Vercel needs correct canonical URLs for social sharing, and a portfolio case study needs a clear attribution thread that does not clutter the analysis UX.
+
+The decision: set `metadataBase` from env (`NEXT_PUBLIC_SITE_URL` with Vercel fallbacks), wire Open Graph and Twitter images to the optimized `og-image.jpg`, use App Router icon files for favicons, and add a reusable `PortfolioSiteCredit` component across landing, shell pages, deck viewer footers, and PDF footer copy, all pointing consistently to `hannahkraulikpagade.com`.
+
+**Lesson:** Shipping is not only features. It is how the product looks when linked on LinkedIn and how clearly ownership and limitations read next to AI output.
+
+### Pivot D — Share URLs as first-class persistence
+
+`sessionStorage` dies with the tab. Demos and "send this read" use cases need something durable enough to present without building authentication.
+
+The decision: on successful analyze, compare, and briefing flows, insert a row into `financelens_sessions` with a nanoid slug and a 30-day `expires_at`. The deck viewer at `/deck/[slug]` resolves the row and renders the stored analysis or comparison. Expired slugs return a clean 410 branded error state. If Supabase env is missing, PPTX and PDF download still work — graceful degradation means the share path fails silently without breaking the core workflow.
+
+**Lesson:** We traded account complexity for time-boxed, link-based persistence. The artifact, not the login, is the unit of sharing.
+
+### Pivot E — Compare accordion for scannable delta output
+
+The compare results page originally rendered all delta sections as stacked, always-visible content. Long comparisons required significant scrolling before a reviewer could assess which sections were worth reading.
+
+The decision: convert all delta sections to an accordion layout. Claim shifts and new language sections expand by default because those carry the most analytical signal. All other sections are collapsed, showing a summary line and item count in the header. The implementation uses React `useState` with CSS `max-height` transition, no external library, 44px touch targets for mobile.
+
+**Lesson:** The order in which information reveals itself is a product decision. Start with what is most likely to matter, let reviewers pull the rest.
 
 ---
 
@@ -142,13 +176,13 @@ The result removed a third-party OAuth dependency, gave full control over the br
 
 **Six output sections (actual shipped labels):** What they said, What it actually means, Key numbers, Language drift (hedge/firm tags with quoted phrases), Worth a closer look, Source anchors. Confidence score as a separate toggleable element with a 0-100 LLM-assigned rubric on evidence density. Not a statistical prediction. Not a stock recommendation.
 
-**Speed:** Haiku default for latency. Sonnet available for deeper passes.
+**Speed:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) for all translate and verify calls. Sonnet is used throughout rather than a smaller model because clinical and financial plain-language work requires high-quality structured output. No Haiku routing is implemented.
 
-**Persistence:** Results in sessionStorage for the tab session. Share analysis saves to Supabase and returns a share URL at `/deck/[slug]` with a 30-day TTL. Expiry is displayed in the viewer.
+**Persistence:** Results in sessionStorage for the tab session. Share analysis saves to Supabase and returns a share URL at `/deck/[slug]` with a 30-day TTL. Expiry is displayed in the viewer. Expired slugs return a 410 branded error state.
 
 ### Compare mode (`/compare`)
 
-Two documents, same document-type framing. One Claude call returns structured JSON: overview of the period-over-period shift, new language in Document B, language dropped from Document A, claim shifts with direction indicators (firm to hedge or reverse), metrics narrative, dual confidence scores side by side. Six built-in sample pairs for instant demos. Share comparison saves to Supabase at a 30-day `/deck/[slug]` URL with a compare-specific A/B column layout. `maxDuration: 120` on the route prevents Vercel timeout on long paired pastes.
+Two documents, same document-type framing. One Claude call returns structured JSON: overview of the period-over-period shift, new language in Document B, language dropped from Document A, claim shifts with direction indicators (firm to hedge or reverse), metrics narrative, dual confidence scores side by side. Six built-in sample pairs for instant demos. Results render as an accordion layout: claim shifts and new language expanded by default, all other sections collapsible with summary line and item count visible in the header. Share comparison saves to Supabase at a 30-day `/deck/[slug]` URL with a compare-specific layout. `maxDuration: 120` on the route prevents Vercel timeout on long paired pastes.
 
 ### Briefing deck (from results)
 
@@ -193,11 +227,14 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 | Image pipeline | Unsplash API (primary) + Pollinations (fallback) | `imageSearchQuery` → Unsplash landscape search with attribution and download ping per guidelines. `imagePrompt` → Pollinations URL when Unsplash returns no usable result. |
 | Share URL | Supabase-backed, 30-day TTL | Session storage dies with the tab. 30-day TTL balances persistence with storage cost. Expiry shown in viewer. |
 | Design system | WSJ Editorial light | Editorial financial journalism register, not consumer fintech. Signals analysis context before a word is read. |
-| PDF export | pdf-lib, Node runtime, `maxDuration: 60s` | Branded PDF with FinanceLens identity, all sections, disclaimer. |
-| PPTX export | pptxgenjs, browser, blob download | Async image fetch then blob download. No server-side file storage required. |
-| Persistence | Supabase `financelens_sessions` table | Columns: `id`, `document_type`, `document_text`, `analysis`, `slides`, `share_slug` (unique), `layout` (`briefing` or `compare`), `created_at`, `expires_at`. Public read by slug. Public insert. No auth. RLS enabled. |
+| PDF export | pdf-lib, Node runtime, `maxDuration: 60s` | Branded PDF with FinanceLens identity, all sections, disclaimer. WSJ Editorial token colors. Georgia and IBM Plex Mono typography. |
+| PPTX export | pptxgenjs, browser, blob download | Slide titles and body use Calibri (Office-safe default). WSJ Editorial brand colors applied to slide chrome. Async image fetch before blob download. |
+| Persistence | Supabase `financelens_sessions` table | Columns: `id`, `document_type`, `document_text`, `analysis`, `slides`, `share_slug` (unique), `layout` (`briefing` or `compare`), `created_at`, `expires_at` (30-day TTL). Note: analyze-only rows use `layout: "briefing"` with `slides: null`. Deck viewer branches on whether `slides` exist, not on a distinct `analysis` layout value. Public read by slug. Public insert. No auth. RLS enabled. |
+| Session expiry | 30-day TTL, 410 for expired slugs | Expired share links return a branded 410 error state. Expiry date shown in viewer header. Privacy-by-design: no indefinite storage of shared content. |
 | Routes | `/`, `/analyze`, `/results`, `/compare`, `/deck/[slug]`, `/methodology`, `/api/analyze`, `/api/compare`, `/api/briefing`, `/api/export-pdf`, `/api/parse-pdf` | |
-| Env vars | `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, optional `UNSPLASH_ACCESS_KEY`, optional `ANTHROPIC_ANALYZE_*` tuning | |
+| Env vars | `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SITE_URL` (canonical base, used in `metadataBase`), `NEXT_PUBLIC_APP_URL` (share link construction), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, optional `UNSPLASH_ACCESS_KEY` | `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_APP_URL` serve different purposes. `.env.example` should document both. |
+| Styling | Tailwind CSS v4 (utility base) + custom `.fl-*` CSS classes | Tailwind provides the reset and utility foundation. The majority of UI layout and component styling is implemented as custom `.fl-*` CSS class names, not utility-class-driven layouts. |
+| Compare accordion | React useState, CSS max-height transition, no library | Claim shifts and new language expanded by default. All sections independently collapsible. 44px touch targets. Summary line and item count visible in collapsed header. |
 | Deploy | Vercel. Analyze and compare routes `maxDuration: 120s` | Prevents timeout on long paired pastes in compare mode. |
 
 ---
@@ -208,15 +245,20 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 
 | Area | Status | Notes |
 |---|---|---|
-| Paste → analyze → results | Working | Typed JSON, guardrail phrasing, drift tags, source anchors, confidence meter, optional fast model. |
-| PDF upload | Working | Server-side pdf-parse with extracted text preview and truncation notice. Text-layer only. |
-| Compare mode | Working | Two pasted texts with A/B framing, claim shifts, six sample pairs, share URL, `maxDuration` protection. |
-| Briefing deck | Working | Slide outline, PPTX download, share deck copy-to-clipboard, full-screen deck via `/deck/[slug]`. |
-| Deck viewer scroll + full-screen | Working | Both views operational for briefing and compare layouts. Keyboard navigation. |
-| Branded PDF export | Working | Consistent FinanceLens identity, all sections, disclaimer. |
-| Methodology page | Working | `/methodology` explains all AI usage, confidence framing, image sourcing, and assistive-only scope. |
-| Validation and retry | Working | `claudeJsonWithRetry` reduces empty failures from malformed model JSON. |
-| Graceful degradation | Working | If Supabase insert fails, PPTX download still works offline. |
+| Paste → analyze → results | Working | Six-section typed JSON, guardrail phrasing, drift tags, source anchors where present, confidence meter. Claude Sonnet 4 throughout. |
+| PDF upload | Working | Server-side pdf-parse, text-layer only. Scanned PDFs require paste. UI copy reflects this accurately. |
+| Compare mode | Working | Two pasted texts, six delta sections, claim shifts and new language expanded by default, all sections independently collapsible, six sample pairs, share URL, `maxDuration` protection. |
+| Compare accordion | Working | Accordion layout with CSS max-height transition, 44px touch targets, summary line visible when collapsed. |
+| Briefing deck | Working | 7-slide Claude outline, PPTX download, share deck copy-to-clipboard, full-screen deck via `/deck/[slug]`. |
+| Deck viewer scroll + full-screen | Working | Both views operational. Keyboard navigation. 30-day TTL shown at top. |
+| Branded PDF export | Working | pdf-lib, WSJ Editorial token colors, Georgia + IBM Plex Mono. Calibri in PPTX export (Office-safe). |
+| Methodology page | Working | `/methodology` explains AI usage, confidence framing, image sourcing, and assistive-only scope. |
+| Validation and retry | Working | `claudeJsonWithRetry` with one repair turn before error state. |
+| Session expiry | Working | 30-day TTL, `expires_at` in DB, 410 error state for expired slugs. |
+| Graceful degradation | Working | Supabase insert failure does not block PPTX or PDF download. |
+| Media pipeline | Working | `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. OG/Twitter metadata wired. |
+| Portfolio attribution | Working | `PortfolioSiteCredit` component on landing, shell, deck viewer, and PDF footer. `metadataBase` from `NEXT_PUBLIC_SITE_URL`. |
+| Iframe embed headers | Working | CSP `frame-ancestors` and `X-Frame-Options` configured for `hannahkraulikpagade.com`. |
 | Build hygiene | Working | `getSupabase()` guard prevents build crashes without Supabase env. |
 
 ### Known gaps and roadmap
@@ -235,26 +277,26 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 ## SECTION 7 — PORTFOLIO COPY
 
 ### Proof point (short callout for site)
-The product thesis is simple: translation is the minimum. Intelligence is the product. FinanceLens does not summarize financial documents. It structures them into six sections of analysis, surfaces where the language shifted, ties every claim to a source, and closes the loop at a permanent shareable URL.
+The shift from "we will deliver" to "we believe we are well positioned to deliver" is not a stylistic choice. It is information. FinanceLens structures financial documents into six sections of analysis, surfaces where the language shifted, ties claims to source passages when present, and closes the loop at a 30-day shareable URL.
 
 ### Stats
 - 6 structured analysis sections per document
-- 2-document compare mode with language drift delta
-- Zod-validated JSON pipeline from Claude to shareable artifact
+- 2-document compare mode with accordion delta output
+- 5 pivot decisions from Canva API to media pipeline to share URL persistence
 
 ### Card summary
-Earnings calls, 10-Ks, and regulatory filings structured into six sections: plain language translation, key claims, numbers with context, language drift detection, items worth a closer look, and a confidence rubric. Paste or upload. Includes two-document compare mode, branded PDF share, PPTX download, and a permanent share URL at a custom deck viewer.
+Earnings calls, 10-Ks, and regulatory filings structured into six sections: plain language translation, key claims, numbers with context, language drift detection, items worth a closer look, and source anchors. Paste or upload. Two-document compare mode with expandable delta sections. Branded PDF, PPTX download, and a 30-day share URL at a custom deck viewer.
 
 ### Project description
-FinanceLens AI translates financial documents into structured intelligence. The output is not a summary. It is six distinct analytical sections, each with a defined purpose: plain language translation, key claims with source anchors, numbers with contextual explanation, language drift and hedge detection, items worth a closer look, and a confidence rubric. Paste or upload an earnings call, 10-K, or regulatory notice. Compare two documents side by side for delta analysis. Share the output as a branded PDF, PPTX deck, or permanent URL.
+FinanceLens AI translates financial documents into structured intelligence. Not a summary. Six distinct analytical sections with source anchors, language drift detection with hedge/firm tagging, and a confidence rubric. Compare two documents for delta analysis with an accordion layout that surfaces the most signal-rich sections first. Share output as branded PDF, PPTX deck, or 30-day URL.
 
 ### Problem statement
-Financial documents are written for lawyers and analysts. Earnings calls, 10-Ks, and regulatory notices are among the most consequential documents a company publishes. They are also nearly inaccessible to anyone without a trained framework for reading them. A retail investor and a portfolio manager receive the same public document. They are not receiving the same information. FinanceLens closes part of that gap with structured intelligence: not a shorter version of the document, but a different kind of product built on top of it.
+Financial documents are written for lawyers and analysts. Earnings calls, 10-Ks, and regulatory notices are among the most consequential documents a company publishes. They are nearly inaccessible to anyone without a trained framework for reading them. FinanceLens closes part of that gap with structured intelligence: not a shorter version of the document, but a different kind of product built on top of it.
 
 ### Process steps
-1. **The product thesis** — Summarization is a solved problem. Intelligence is not. The brief was to build a tool that structures financial documents into distinct analytical sections, each with a defined purpose, with every claim sourced back to the original document. Six sections, Zod-validated, with language drift detection as the most analytically novel capability.
-2. **The architecture decision** — Claude Sonnet 4 with a strict typed JSON output contract. Each section is a defined field in the schema. Source anchors are a required field: if a claim cannot be tied to a source passage, the validation fails. The repair pass uses a structured prompt before surfacing an error state.
-3. **The pivot** — The original spec used the Canva Connect API for presentation output. During build, Canva's app review process blocked API access with no timeline. The architecture was redesigned to own the presentation layer entirely: Claude generates a deck outline, pptxgenjs renders the PPTX, pdf-lib generates the branded PDF, and a custom deck viewer at a Supabase-backed 30-day share URL closes the loop. The Canva integration stays on the roadmap as additive. The core workflow does not depend on it.
+1. **The product thesis** — Summarization is a solved problem. Intelligence is not. The brief was to build a tool that structures financial documents into distinct analytical sections with source anchors where available, Zod-validated, with language drift detection as the most analytically novel capability.
+2. **The architecture** — Claude Sonnet 4 (`claude-sonnet-4-20250514`) with a strict typed JSON output contract and `claudeJsonWithRetry` for one structured repair turn on failure. Source anchors are prompt-required and surfaced when present. The compare mode uses a diff-aware system prompt, a distinct architecture from standard analysis.
+3. **The pivots** — Five documented decisions: Canva API replaced with an owned presentation layer, multi-megabyte design exports replaced with a Sharp-optimized media pipeline, portfolio attribution wired across landing and deck viewer, share URLs implemented as 30-day Supabase-backed sessions with 410 expiry, and compare results rebuilt as an accordion layout with default-open signal sections.
 
 ### Process steps interactive (sidebar anchors)
 - The Product Thesis
@@ -288,22 +330,23 @@ The intelligence is in the delta. What changed from last quarter. Where manageme
 ### Honest summary
 
 **Technical understanding:**
-The Zod validation architecture is the technical centerpiece of this case study. Claude Sonnet 4 produces a typed JSON object with six defined fields, one for each analysis section (What they said, What it actually means, Key numbers, Language drift, Worth a closer look, Source anchors). Source anchors are a required field in the schema: missing source references fail validation and trigger a structured repair prompt via `lib/claudeJsonWithRetry.ts`. The repair prompt is not a generic retry. It tells Claude which fields failed and asks for a targeted correction. The compare mode system prompt is architecturally distinct from the standard analysis prompt: it is a diff-aware instruction set that produces deltas, not two analyses. The presentation layer is fully owned: Claude generates a structured JSON deck outline, pptxgenjs renders the PPTX, pdf-lib generates the branded PDF, and a custom Next.js route serves the 30-day deck viewer. Image pipeline: Unsplash primary with attribution, Pollinations as fallback.
+Claude Sonnet 4 (`claude-sonnet-4-20250514`) is used for all translate, verify, compare, and briefing calls. No Haiku routing is implemented. Source anchors are prompt-required and surfaced when the model includes them; `supportingEvidence` is optional in the Zod schema, not a hard validation gate. `claudeJsonWithRetry` fires one structured repair turn before the error state surfaces. The compare mode uses a diff-aware system prompt, architecturally distinct from standard analysis. The presentation layer is fully owned: Claude deck outline, pptxgenjs PPTX (Calibri for Office compatibility), pdf-lib PDF (WSJ Editorial typography), custom Next.js deck viewer at 30-day Supabase URLs with 410 on expiry. Media pipeline: `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. The UI is mostly custom `.fl-*` CSS classes; Tailwind provides the reset and utility base.
 
 **Product understanding:**
-The product hypothesis is that structured intelligence and summarization are different products. Every architectural decision in FinanceLens follows from that hypothesis. The six-section schema is not a UX choice about presentation. It is a product decision about what constitutes a useful financial document analysis. The language drift section does not exist in other AI document tools because it requires a system prompt specifically designed to produce hedge/firm classification, not just a general analysis. The pivot from Canva API to an owned presentation layer was a product decision: a tool that requires a third-party OAuth approval to close its core workflow loop has a dependency that will materialize as a risk. Owning the layer removes it.
+The product hypothesis is that structured intelligence and summarization are different products. Every architectural decision follows from that hypothesis. The language drift section requires a system prompt specifically designed to produce hedge/firm classification. Five pivot decisions are documented in Section 3: Canva to owned layer, design exports to build pipeline, attribution as shipping criteria, share URLs as the unit of sharing, and compare accordion as information reveal design. The honest gaps: source anchors are optional in schema not required, no streaming on analyze, no rate limiting before public traffic, no observability before monetization.
 
 **Design understanding:**
-The WSJ Editorial light design system was chosen because the aesthetic signals context. FinanceLens is an analysis tool, not a consumer finance app. The visual language of financial journalism: clean white backgrounds, high-contrast type, restrained accent color, dense information layout at readable column widths, communicates that context immediately. The compare mode layout required the most design work: two documents, six sections each, with delta highlights that do not create visual noise. The solution is delta cards that surface only the most significant language shifts, with the full comparison available on expand.
+The WSJ Editorial light design system has three distinct typeface roles: Fraunces for landing and display headings, Georgia for app and report surfaces, IBM Plex Mono for financial data and labels. The compare accordion layout was a product design decision: claim shifts and new language expanded by default because those carry the most analytical signal. All other sections show a summary line and item count in the collapsed header. PPTX uses Calibri because it is the Office-safe default, not the brand choice. The deck viewer scroll and full-screen modes serve different use cases: scroll for reading, full-screen for presenting.
 
 ### What this demonstrates
-- Structured AI output architecture using typed JSON contracts and Zod validation
-- Understanding that summarization and intelligence are different product problems
-- Source anchor design as a trust architecture decision, not a UX feature
-- Pivot story demonstrating real-world constraint management in product development
-- Full owned presentation layer: PDF, PPTX, and custom deck viewer without third-party dependencies
+- Structured AI output architecture using typed JSON contracts and Zod validation with repair
+- Product-level distinction between summarization and intelligence
+- Five documented pivot decisions each with a real constraint, decision, and outcome
+- Accordion-style compare UX: information reveal order as a product decision
+- Fully owned presentation layer without third-party OAuth dependency
+- Media pipeline discipline: design exports treated as build artifacts, not direct deploys
 - Financial domain fluency: earnings calls, 10-K structure, language drift in investor communications
-- Full-stack build from product definition to deployed, shareable artifact
+- Full-stack build from product definition to deployed, shareable artifact with 30-day share URLs and 410 expiry
 
 ---
 
