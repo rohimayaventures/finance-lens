@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
-import type { CSSProperties, FormEvent } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 function clientShareBaseUrl(): string {
@@ -200,22 +200,106 @@ const DOC_TYPE_OPTIONS: Array<{ value: DocType; label: string }> = [
   { value: "regulatory", label: "Regulatory notice" },
 ];
 
-function ListBlock({ title, items, id }: { title: string; items: string[]; id: string }) {
-  if (!items.length) return null;
+const COMPARE_ACC_KEYS = {
+  overview: "acc-overview",
+  confidence: "acc-confidence",
+  metrics: "acc-metrics",
+  new: "compare-new",
+  dropped: "compare-dropped",
+  claims: "compare-claims",
+} as const;
+
+const DEFAULT_COMPARE_ACC_OPEN: Record<string, boolean> = {
+  [COMPARE_ACC_KEYS.overview]: false,
+  [COMPARE_ACC_KEYS.confidence]: false,
+  [COMPARE_ACC_KEYS.metrics]: false,
+  [COMPARE_ACC_KEYS.new]: true,
+  [COMPARE_ACC_KEYS.dropped]: false,
+  [COMPARE_ACC_KEYS.claims]: true,
+};
+
+function truncateComparePreview(text: string, maxLen = 96): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (!t.length) return "—";
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, maxLen - 1)}…`;
+}
+
+function listSectionSummary(items: string[]): string {
+  if (!items.length) return "—";
+  return truncateComparePreview(items[0] ?? "", 88);
+}
+
+function CompareAccordionChevron() {
   return (
-    <section id={id} className="fl-app-report-section fl-compare-result-block">
-      <div className="fl-app-section-head">
-        <span className="fl-app-section-num">◇</span>
-        <h2 className="fl-app-section-title">{title}</h2>
+    <svg
+      className="fl-compare-acc-chevron"
+      width={12}
+      height={12}
+      viewBox="0 0 12 12"
+      aria-hidden
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3 4.5L6 7.5L9 4.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CompareAccordionSection({
+  sectionId,
+  label,
+  summaryPreview,
+  countLabel,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  sectionId: string;
+  label: string;
+  summaryPreview: string;
+  countLabel: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const panelId = `${sectionId}-panel`;
+  const labelId = `${sectionId}-header-label`;
+  return (
+    <div className="fl-compare-acc-item" id={sectionId}>
+      <button
+        type="button"
+        className={`fl-compare-acc-header${isOpen ? " is-open" : ""}`}
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+      >
+        <span className="fl-compare-acc-header-main">
+          <span className="fl-compare-acc-label" id={labelId}>
+            {label}
+          </span>
+          <span className="fl-compare-acc-summary">{summaryPreview}</span>
+        </span>
+        <span className="fl-compare-acc-header-right">
+          <span className="fl-compare-acc-pill">{countLabel}</span>
+          <CompareAccordionChevron />
+        </span>
+      </button>
+      <div
+        id={panelId}
+        className={`fl-compare-acc-panel${isOpen ? " is-open" : ""}`}
+        role="region"
+        aria-labelledby={labelId}
+      >
+        <div className="fl-compare-acc-panel-inner">{children}</div>
       </div>
-      <ul className="fl-compare-list">
-        {items.map((item, i) => (
-          <li key={i} className="fl-app-prose fl-compare-list-item">
-            {item}
-          </li>
-        ))}
-      </ul>
-    </section>
+    </div>
   );
 }
 
@@ -229,6 +313,11 @@ export default function ComparePage() {
   const [compareShareSlug, setCompareShareSlug] = useState<string | null>(null);
   const [compareShareCopied, setCompareShareCopied] = useState(false);
   const [activePairId, setActivePairId] = useState<string | null>(null);
+  const [compareAccOpen, setCompareAccOpen] = useState<Record<string, boolean>>(() => ({ ...DEFAULT_COMPARE_ACC_OPEN }));
+
+  const toggleCompareAcc = (key: string) => {
+    setCompareAccOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const loadSamplePair = (pair: CompareSamplePair) => {
     setTextA(pair.textA);
@@ -282,6 +371,7 @@ export default function ComparePage() {
       delete rest.shareSlug;
       delete rest.shareUrl;
       setResult(rest as CompareResult);
+      setCompareAccOpen({ ...DEFAULT_COMPARE_ACC_OPEN });
       setCompareShareSlug(typeof shareSlug === "string" && shareSlug.length > 0 ? shareSlug : null);
     } catch {
       setError("Compare failed. Please try again.");
@@ -452,57 +542,121 @@ export default function ComparePage() {
                 ) : null}
               </div>
 
-              <section className="fl-app-report-section">
-                <div className="fl-app-section-head">
-                  <span className="fl-app-section-num">↔</span>
-                  <h2 className="fl-app-section-title">Overview</h2>
-                </div>
-                <p className="fl-app-prose">{result.overview}</p>
-              </section>
+              <div className="fl-compare-acc-stack">
+                <CompareAccordionSection
+                  sectionId={COMPARE_ACC_KEYS.overview}
+                  label="Overview"
+                  summaryPreview={truncateComparePreview(result.overview)}
+                  countLabel="1"
+                  isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.overview])}
+                  onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.overview)}
+                >
+                  <p className="fl-app-prose">{result.overview}</p>
+                </CompareAccordionSection>
 
-              <section className="fl-app-report-section">
-                <div className="fl-app-section-head">
-                  <span className="fl-app-section-num">01</span>
-                  <h2 className="fl-app-section-title">Confidence</h2>
-                </div>
-                <p className="fl-compare-confidence-explainer">
-                  These percentages are a <strong>model judgment</strong> of how much <strong>concrete, checkable detail</strong> each text
-                  contains (specific figures, dates, named segments, firm claims) versus vague or generic wording—not a statistical
-                  confidence interval, model certainty, or a read on stock performance. Use them as a rough signal for how much evidence
-                  the comparison is working from in each document.
-                </p>
-                <div className="fl-compare-confidence-row">
-                  <div>
-                    <p className="fl-app-label fl-app-label--flush fl-compare-meter-cap">Document A</p>
-                    <div className="fl-app-meter-track">
-                      <div className="fl-app-meter-fill" style={{ "--fl-meter": `${result.confidenceA}%` } as CSSProperties} />
+                <CompareAccordionSection
+                  sectionId={COMPARE_ACC_KEYS.confidence}
+                  label="Confidence"
+                  summaryPreview={`Document A ${result.confidenceA}% · Document B ${result.confidenceB}%`}
+                  countLabel="2"
+                  isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.confidence])}
+                  onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.confidence)}
+                >
+                  <p className="fl-compare-confidence-explainer">
+                    These percentages are a <strong>model judgment</strong> of how much <strong>concrete, checkable detail</strong> each
+                    text contains (specific figures, dates, named segments, firm claims) versus vague or generic wording—not a statistical
+                    confidence interval, model certainty, or a read on stock performance. Use them as a rough signal for how much evidence
+                    the comparison is working from in each document.
+                  </p>
+                  <div className="fl-compare-confidence-row">
+                    <div>
+                      <p className="fl-app-label fl-app-label--flush fl-compare-meter-cap">Document A</p>
+                      <div className="fl-app-meter-track">
+                        <div className="fl-app-meter-fill" style={{ "--fl-meter": `${result.confidenceA}%` } as CSSProperties} />
+                      </div>
+                      <p className="fl-compare-confidence-pct">{result.confidenceA}%</p>
                     </div>
-                    <p className="fl-compare-confidence-pct">{result.confidenceA}%</p>
-                  </div>
-                  <div>
-                    <p className="fl-app-label fl-app-label--flush fl-compare-meter-cap">Document B</p>
-                    <div className="fl-app-meter-track">
-                      <div className="fl-app-meter-fill" style={{ "--fl-meter": `${result.confidenceB}%` } as CSSProperties} />
+                    <div>
+                      <p className="fl-app-label fl-app-label--flush fl-compare-meter-cap">Document B</p>
+                      <div className="fl-app-meter-track">
+                        <div className="fl-app-meter-fill" style={{ "--fl-meter": `${result.confidenceB}%` } as CSSProperties} />
+                      </div>
+                      <p className="fl-compare-confidence-pct">{result.confidenceB}%</p>
                     </div>
-                    <p className="fl-compare-confidence-pct">{result.confidenceB}%</p>
                   </div>
-                </div>
-                {result.confidenceNote ? <p className="fl-app-prose fl-app-hint-spaced">{result.confidenceNote}</p> : null}
-              </section>
+                  {result.confidenceNote ? <p className="fl-app-prose fl-app-hint-spaced">{result.confidenceNote}</p> : null}
+                </CompareAccordionSection>
 
-              {result.metricsNarrative ? (
-                <section className="fl-app-report-section">
-                  <div className="fl-app-section-head">
-                    <span className="fl-app-section-num">02</span>
-                    <h2 className="fl-app-section-title">Metrics & guidance</h2>
-                  </div>
-                  <p className="fl-app-prose">{result.metricsNarrative}</p>
-                </section>
-              ) : null}
+                {result.metricsNarrative ? (
+                  <CompareAccordionSection
+                    sectionId={COMPARE_ACC_KEYS.metrics}
+                    label="Metrics & guidance"
+                    summaryPreview={truncateComparePreview(result.metricsNarrative)}
+                    countLabel="1"
+                    isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.metrics])}
+                    onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.metrics)}
+                  >
+                    <p className="fl-app-prose">{result.metricsNarrative}</p>
+                  </CompareAccordionSection>
+                ) : null}
 
-              <ListBlock id="compare-new" title="New or stronger language in B" items={result.newLanguage} />
-              <ListBlock id="compare-dropped" title="Softened or absent vs. A" items={result.droppedLanguage} />
-              <ListBlock id="compare-claims" title="Claim & tone shifts" items={result.claimShifts} />
+                {result.newLanguage.length > 0 ? (
+                  <CompareAccordionSection
+                    sectionId={COMPARE_ACC_KEYS.new}
+                    label="New or stronger language in B"
+                    summaryPreview={listSectionSummary(result.newLanguage)}
+                    countLabel={String(result.newLanguage.length)}
+                    isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.new])}
+                    onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.new)}
+                  >
+                    <ul className="fl-compare-list">
+                      {result.newLanguage.map((item, i) => (
+                        <li key={i} className="fl-app-prose fl-compare-list-item">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </CompareAccordionSection>
+                ) : null}
+
+                {result.droppedLanguage.length > 0 ? (
+                  <CompareAccordionSection
+                    sectionId={COMPARE_ACC_KEYS.dropped}
+                    label="Softened or absent vs. A"
+                    summaryPreview={listSectionSummary(result.droppedLanguage)}
+                    countLabel={String(result.droppedLanguage.length)}
+                    isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.dropped])}
+                    onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.dropped)}
+                  >
+                    <ul className="fl-compare-list">
+                      {result.droppedLanguage.map((item, i) => (
+                        <li key={i} className="fl-app-prose fl-compare-list-item">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </CompareAccordionSection>
+                ) : null}
+
+                {result.claimShifts.length > 0 ? (
+                  <CompareAccordionSection
+                    sectionId={COMPARE_ACC_KEYS.claims}
+                    label="Claim & tone shifts"
+                    summaryPreview={listSectionSummary(result.claimShifts)}
+                    countLabel={String(result.claimShifts.length)}
+                    isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.claims])}
+                    onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.claims)}
+                  >
+                    <ul className="fl-compare-list">
+                      {result.claimShifts.map((item, i) => (
+                        <li key={i} className="fl-app-prose fl-compare-list-item">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </CompareAccordionSection>
+                ) : null}
+              </div>
 
               <div className="fl-app-disclaimer">
                 <p>
