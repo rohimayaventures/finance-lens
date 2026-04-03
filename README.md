@@ -51,7 +51,7 @@ Paste a financial document and FinanceLens returns structured intelligence:
 | Framework | Next.js 16 (App Router), React 19 |
 | Language | TypeScript |
 | Styling | Tailwind CSS v4 |
-| AI | Claude (Sonnet / Haiku via env & “Faster model” toggle) |
+| AI | Claude Sonnet 4 (`claude-sonnet-4-20250514` for analyze/compare; override via env) |
 | Validation | Zod + one-shot JSON repair retry |
 | Deck file | pptxgenjs (client) |
 | PDF | pdf-lib (API route) |
@@ -74,6 +74,7 @@ Create `.env.local`:
 
 ```bash
 ANTHROPIC_API_KEY=your_key_here
+NEXT_PUBLIC_SITE_URL=https://financelens-ai.vercel.app
 NEXT_PUBLIC_APP_URL=https://financelens-ai.vercel.app
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -82,10 +83,12 @@ UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 
 `UNSPLASH_ACCESS_KEY` (Unsplash **Access Key**) powers stock photos in briefing slides. Without it, optional abstract image URLs are still used when the model emits prompts.
 
+`NEXT_PUBLIC_SITE_URL` is the canonical site origin for `metadataBase` / Open Graph (falls back to Vercel URL detection in `app/layout.tsx` when unset). `NEXT_PUBLIC_APP_URL` is used for share links and public deck URLs.
+
 Optional analysis tuning:
 
-- `ANTHROPIC_ANALYZE_MODEL` / `ANTHROPIC_ANALYZE_MODEL_FAST`
-- `ANTHROPIC_ANALYZE_MAX_TOKENS` / `ANTHROPIC_ANALYZE_MAX_TOKENS_FAST`
+- `ANTHROPIC_ANALYZE_MODEL` (default Sonnet 4)
+- `ANTHROPIC_ANALYZE_MAX_TOKENS`
 
 The analyze route sets `maxDuration` to **120s**; **Vercel Hobby** may still cap execution time lower than that.
 

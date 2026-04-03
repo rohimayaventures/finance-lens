@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
+import { claimDirectionLabel, type ClaimShiftItem } from "@/lib/schemas/compare";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
@@ -190,7 +191,7 @@ type CompareResult = {
   confidenceA: number;
   confidenceB: number;
   confidenceNote: string;
-  claimShifts: string[];
+  claimShifts: ClaimShiftItem[];
   metricsNarrative: string;
 };
 
@@ -642,15 +643,21 @@ export default function ComparePage() {
                   <CompareAccordionSection
                     sectionId={COMPARE_ACC_KEYS.claims}
                     label="Claim & tone shifts"
-                    summaryPreview={listSectionSummary(result.claimShifts)}
+                    summaryPreview={listSectionSummary(result.claimShifts.map((c) => c.text))}
                     countLabel={String(result.claimShifts.length)}
                     isOpen={Boolean(compareAccOpen[COMPARE_ACC_KEYS.claims])}
                     onToggle={() => toggleCompareAcc(COMPARE_ACC_KEYS.claims)}
                   >
-                    <ul className="fl-compare-list">
+                    <ul className="fl-compare-list fl-compare-claim-shift-list">
                       {result.claimShifts.map((item, i) => (
-                        <li key={i} className="fl-app-prose fl-compare-list-item">
-                          {item}
+                        <li key={i} className="fl-compare-claim-shift-row">
+                          <span
+                            className="fl-viewer-compare-shift-badge"
+                            data-direction={item.direction}
+                          >
+                            {claimDirectionLabel(item.direction)}
+                          </span>
+                          <span className="fl-app-prose fl-compare-claim-shift-text">{item.text}</span>
                         </li>
                       ))}
                     </ul>

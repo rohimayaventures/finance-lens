@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { DeckViewer, type SharedAnalysis } from "@/components/DeckViewer";
 import type { BriefingSlide } from "@/lib/briefingTypes";
 import { compareResultSchema } from "@/lib/schemas/compare";
@@ -19,7 +20,7 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ slu
 
   const supabase = getSupabase();
   if (!supabase) {
-    return <ExpiredOrMissing homeUrl={homeUrl} />;
+    return <SharedDeckUnavailable homeUrl={homeUrl} />;
   }
 
   const { data, error } = await supabase
@@ -29,12 +30,12 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ slu
     .maybeSingle();
 
   if (error || !data) {
-    return <ExpiredOrMissing homeUrl={homeUrl} />;
+    notFound();
   }
 
   const row = data as SessionRow;
   if (isShareSessionExpired(row.expires_at)) {
-    return <ExpiredOrMissing homeUrl={homeUrl} />;
+    return <ExpiredDeck homeUrl={homeUrl} />;
   }
 
   const layoutCol = typeof row.layout === "string" && row.layout.trim() ? row.layout.trim() : null;
@@ -60,7 +61,7 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ slu
   }
 
   if (!analysisObj) {
-    return <ExpiredOrMissing homeUrl={homeUrl} />;
+    notFound();
   }
 
   if (layoutCol === "compare") {
@@ -109,13 +110,27 @@ export default async function SharedDeckPage({ params }: { params: Promise<{ slu
     );
   }
 
-  return <ExpiredOrMissing homeUrl={homeUrl} />;
+  notFound();
 }
 
-function ExpiredOrMissing({ homeUrl }: { homeUrl: string }) {
+function SharedDeckUnavailable({ homeUrl }: { homeUrl: string }) {
   return (
     <div className="fl-viewer-missing">
-      <p className="fl-viewer-missing-title">This deck has expired or does not exist</p>
+      <p className="fl-viewer-missing-title">Shared decks are not configured</p>
+      <p className="fl-viewer-missing-copy">
+        This deployment is missing storage settings for share links. Try the main FinanceLens site or contact the operator.
+      </p>
+      <Link href={homeUrl} className="fl-app-nav-btn">
+        Back to FinanceLens AI
+      </Link>
+    </div>
+  );
+}
+
+function ExpiredDeck({ homeUrl }: { homeUrl: string }) {
+  return (
+    <div className="fl-viewer-missing">
+      <p className="fl-viewer-missing-title">This shared deck has expired</p>
       <p className="fl-viewer-missing-copy">
         Shared links last 30 days. Run a new analysis on FinanceLens to create a fresh link.
       </p>

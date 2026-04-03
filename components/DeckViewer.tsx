@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PortfolioSiteCredit } from "@/components/PortfolioSiteCredit";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { BriefingSlide } from "@/lib/briefingTypes";
-import type { CompareResultValidated } from "@/lib/schemas/compare";
+import { claimDirectionLabel, type CompareResultValidated } from "@/lib/schemas/compare";
 
 type KeyNumber = { value: string; label: string; direction: string };
 type DriftSignal = { type: string; quote: string };
@@ -269,10 +269,10 @@ export function DeckViewer({
           {c.claimShifts.length ? (
             c.claimShifts.map((item, i) => (
               <li key={i} className="fl-viewer-compare-shift-row">
-                <span className="fl-viewer-compare-shift-badge" aria-hidden>
-                  A→B
+                <span className="fl-viewer-compare-shift-badge" data-direction={item.direction}>
+                  {claimDirectionLabel(item.direction)}
                 </span>
-                <span className="fl-viewer-compare-shift-text">{item}</span>
+                <span className="fl-viewer-compare-shift-text">{item.text}</span>
               </li>
             ))
           ) : (

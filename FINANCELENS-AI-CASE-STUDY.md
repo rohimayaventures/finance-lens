@@ -217,7 +217,7 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 | Component | Decision | Rationale |
 |---|---|---|
 | Framework | Next.js 16 App Router, React 19 | Current production versions at build time. |
-| AI model | claude-sonnet-4-20250514 (analyze/compare/briefing), claude-3-5-haiku-20241022 default for fast analyze | Haiku for latency on standard runs. Sonnet for deeper passes and compare mode. |
+| AI model | claude-sonnet-4-20250514 (analyze/compare/briefing); override via `ANTHROPIC_ANALYZE_MODEL` | Sonnet throughout for structured financial plain-language output. |
 | Validation | Zod schemas + `lib/claudeJsonWithRetry.ts` | Silent failures in financial analysis are a trust problem. One repair turn on schema or JSON failure before error state surfaces. |
 | Output contract | Fixed typed JSON schema, six sections | Each section has a distinct analytical purpose. Free-form output would collapse the structure that is the product. |
 | Source anchors | Required field in Zod schema | If a claim cannot be sourced to a passage, it fails validation at the schema level. |
@@ -230,7 +230,7 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 | PDF export | pdf-lib, Node runtime, `maxDuration: 60s` | Branded PDF with FinanceLens identity, all sections, disclaimer. WSJ Editorial token colors. Georgia and IBM Plex Mono typography. |
 | PPTX export | pptxgenjs, browser, blob download | Slide titles and body use Calibri (Office-safe default). WSJ Editorial brand colors applied to slide chrome. Async image fetch before blob download. |
 | Persistence | Supabase `financelens_sessions` table | Columns: `id`, `document_type`, `document_text`, `analysis`, `slides`, `share_slug` (unique), `layout` (`briefing` or `compare`), `created_at`, `expires_at` (30-day TTL). Note: analyze-only rows use `layout: "briefing"` with `slides: null`. Deck viewer branches on whether `slides` exist, not on a distinct `analysis` layout value. Public read by slug. Public insert. No auth. RLS enabled. |
-| Session expiry | 30-day TTL, 410 for expired slugs | Expired share links return a branded 410 error state. Expiry date shown in viewer header. Privacy-by-design: no indefinite storage of shared content. |
+| Session expiry | 30-day TTL; HTTP **404** unknown slug, **410** expired | Edge middleware (`middleware.ts`) checks Supabase before the page: missing slug → 404 HTML; expired `expires_at` → 410 HTML. The deck page uses `notFound()` for missing rows when middleware does not run (e.g. fetch failure). Expiry date shown in viewer header. |
 | Routes | `/`, `/analyze`, `/results`, `/compare`, `/deck/[slug]`, `/methodology`, `/api/analyze`, `/api/compare`, `/api/briefing`, `/api/export-pdf`, `/api/parse-pdf` | |
 | Env vars | `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SITE_URL` (canonical base, used in `metadataBase`), `NEXT_PUBLIC_APP_URL` (share link construction), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, optional `UNSPLASH_ACCESS_KEY` | `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_APP_URL` serve different purposes. `.env.example` should document both. |
 | Styling | Tailwind CSS v4 (utility base) + custom `.fl-*` CSS classes | Tailwind provides the reset and utility foundation. The majority of UI layout and component styling is implemented as custom `.fl-*` CSS class names, not utility-class-driven layouts. |
@@ -254,7 +254,7 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 | Branded PDF export | Working | pdf-lib, WSJ Editorial token colors, Georgia + IBM Plex Mono. Calibri in PPTX export (Office-safe). |
 | Methodology page | Working | `/methodology` explains AI usage, confidence framing, image sourcing, and assistive-only scope. |
 | Validation and retry | Working | `claudeJsonWithRetry` with one repair turn before error state. |
-| Session expiry | Working | 30-day TTL, `expires_at` in DB, 410 error state for expired slugs. |
+| Session expiry | Working | 30-day TTL, `expires_at` in DB, middleware returns 404/410 with branded HTML; deck `notFound()` for missing slug fallback. |
 | Graceful degradation | Working | Supabase insert failure does not block PPTX or PDF download. |
 | Media pipeline | Working | `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. OG/Twitter metadata wired. |
 | Portfolio attribution | Working | `PortfolioSiteCredit` component on landing, shell, deck viewer, and PDF footer. `metadataBase` from `NEXT_PUBLIC_SITE_URL`. |
@@ -314,9 +314,9 @@ Original spec: Canva Connect API for presentation output. Blocked by app review 
 ### What shipped (grouped, for ShippedGrid)
 - **Input:** Text paste, PDF upload (text-layer only), six sample document pairs including compare mode pairs.
 - **Analysis engine:** Six sections (What they said, What it actually means, Key numbers, Language drift, Worth a closer look, Source anchors), Zod validation with repair, toggleable confidence score.
-- **Compare mode:** Two-document delta analysis, A/B column rendering, claim shift direction indicators, six sample pairs.
+- **Compare mode:** Two-document delta analysis, A/B column rendering, claim shifts as typed objects (`direction`: firm / hedge / neutral / mixed + `text`) in Zod, six sample pairs.
 - **Output and sharing:** Branded PDF via pdf-lib, PPTX via pptxgenjs, Claude 7-slide deck outline, Unsplash + Pollinations image pipeline, full-screen deck viewer, 30-day Supabase share URLs, methodology page.
-- **Infrastructure:** Next.js 16, React 19, TypeScript, Tailwind CSS v4, Claude Sonnet 4 / Haiku, Zod, pdf-lib, pptxgenjs, Supabase, Vercel.
+- **Infrastructure:** Next.js 16, React 19, TypeScript, Tailwind CSS v4, Claude Sonnet 4, Zod, pdf-lib, pptxgenjs, Supabase, Vercel.
 
 ### Stack highlighted
 Claude API (Zod-validated six-section output contract), pptxgenjs (owned presentation layer), pdf-lib (branded PDF), Supabase (30-day share URLs)
@@ -330,7 +330,7 @@ The intelligence is in the delta. What changed from last quarter. Where manageme
 ### Honest summary
 
 **Technical understanding:**
-Claude Sonnet 4 (`claude-sonnet-4-20250514`) is used for all translate, verify, compare, and briefing calls. No Haiku routing is implemented. Source anchors are prompt-required and surfaced when the model includes them; `supportingEvidence` is optional in the Zod schema, not a hard validation gate. `claudeJsonWithRetry` fires one structured repair turn before the error state surfaces. The compare mode uses a diff-aware system prompt, architecturally distinct from standard analysis. The presentation layer is fully owned: Claude deck outline, pptxgenjs PPTX (Calibri for Office compatibility), pdf-lib PDF (WSJ Editorial typography), custom Next.js deck viewer at 30-day Supabase URLs with 410 on expiry. Media pipeline: `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. The UI is mostly custom `.fl-*` CSS classes; Tailwind provides the reset and utility base.
+Claude Sonnet 4 (`claude-sonnet-4-20250514`) is used for all translate, verify, compare, and briefing calls. No Haiku routing is implemented. Source anchors are prompt-required and surfaced when the model includes them; `supportingEvidence` is optional in the Zod schema, not a hard validation gate. `claudeJsonWithRetry` fires one structured repair turn before the error state surfaces. The compare mode uses a diff-aware system prompt, architecturally distinct from standard analysis. The presentation layer is fully owned: Claude deck outline, pptxgenjs PPTX (Calibri for Office compatibility), pdf-lib PDF (WSJ Editorial typography), custom Next.js deck viewer at 30-day Supabase URLs with HTTP **404** for unknown slugs and **410** when the share has expired (middleware + branded HTML). Media pipeline: `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. The UI is mostly custom `.fl-*` CSS classes; Tailwind provides the reset and utility base.
 
 **Product understanding:**
 The product hypothesis is that structured intelligence and summarization are different products. Every architectural decision follows from that hypothesis. The language drift section requires a system prompt specifically designed to produce hedge/firm classification. Five pivot decisions are documented in Section 3: Canva to owned layer, design exports to build pipeline, attribution as shipping criteria, share URLs as the unit of sharing, and compare accordion as information reveal design. The honest gaps: source anchors are optional in schema not required, no streaming on analyze, no rate limiting before public traffic, no observability before monetization.
@@ -346,7 +346,7 @@ The WSJ Editorial light design system has three distinct typeface roles: Fraunce
 - Fully owned presentation layer without third-party OAuth dependency
 - Media pipeline discipline: design exports treated as build artifacts, not direct deploys
 - Financial domain fluency: earnings calls, 10-K structure, language drift in investor communications
-- Full-stack build from product definition to deployed, shareable artifact with 30-day share URLs and 410 expiry
+- Full-stack build from product definition to deployed, shareable artifact with 30-day share URLs and correct HTTP 404/410 for missing vs expired links
 
 ---
 

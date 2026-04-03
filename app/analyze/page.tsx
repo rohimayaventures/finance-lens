@@ -109,8 +109,6 @@ export default function AnalyzePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeSampleId, setActiveSampleId] = useState<SampleId | null>(null);
-  /** Haiku by default — much faster than Sonnet for typical pastes. */
-  const [fastAnalysis, setFastAnalysis] = useState(true);
   const [elapsedSec, setElapsedSec] = useState(0);
 
   const finalText = useMemo(() => {
@@ -219,7 +217,6 @@ export default function AnalyzePage() {
           docType,
           driftEnabled,
           confidenceEnabled,
-          fastAnalysis,
         }),
       });
 
@@ -299,7 +296,7 @@ export default function AnalyzePage() {
             />
             Drift detection
           </label>
-          <label className="fl-app-check">
+          <label className="fl-app-check fl-app-check--last">
             <input
               type="checkbox"
               checked={confidenceEnabled}
@@ -307,17 +304,6 @@ export default function AnalyzePage() {
             />
             Confidence scoring
           </label>
-          <label className="fl-app-check fl-app-check--last">
-            <input
-              type="checkbox"
-              checked={fastAnalysis}
-              onChange={(event) => setFastAnalysis(event.target.checked)}
-            />
-            Faster model (Haiku)
-          </label>
-          <p className="fl-app-sidebar-hint fl-app-hint-below-checks">
-            Turn off for Sonnet when you want maximum depth—usually slower, especially on long documents.
-          </p>
         </aside>
 
         <main className="fl-app-main" id="main-content">
@@ -416,8 +402,7 @@ export default function AnalyzePage() {
 
             {longDoc ? (
               <p className="fl-app-hint fl-app-hint-spaced">
-                Long paste ({charCount.toLocaleString()} characters)—first run can take a bit while the model reads the full text. Use{" "}
-                <strong>Faster model (Haiku)</strong> on the left for shorter waits.
+                Long paste ({charCount.toLocaleString()} characters)—first run can take a bit while the model reads the full text.
               </p>
             ) : null}
 

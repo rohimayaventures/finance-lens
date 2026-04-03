@@ -2389,6 +2389,24 @@ header[id] {
   padding-left: 0.25rem;
 }
 
+.fl-compare-list.fl-compare-claim-shift-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.fl-compare-claim-shift-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 0.65rem;
+}
+
+.fl-compare-claim-shift-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
 .fl-compare-result-block .fl-app-section-num {
   letter-spacing: 0;
   font-size: 14px;
@@ -3925,10 +3943,58 @@ header[id] {
   color: var(--red);
 }
 
+.fl-viewer-compare-shift-badge[data-direction="firm"] {
+  border-color: rgba(34, 102, 68, 0.45);
+  background: rgba(34, 102, 68, 0.15);
+  color: #1d5a3a;
+}
+
+.fl-viewer-compare-shift-badge[data-direction="hedge"] {
+  border-color: rgba(120, 90, 40, 0.5);
+  background: rgba(120, 90, 40, 0.18);
+  color: #6b4f1e;
+}
+
+.fl-viewer-compare-shift-badge[data-direction="neutral"] {
+  border-color: rgba(90, 95, 110, 0.45);
+  background: rgba(90, 95, 110, 0.12);
+  color: #4a4f5c;
+}
+
+.fl-viewer-compare-shift-badge[data-direction="mixed"] {
+  border-color: rgba(90, 60, 120, 0.45);
+  background: rgba(90, 60, 120, 0.14);
+  color: #4a3568;
+}
+
 .fl-viewer-fs-list.fl-viewer-compare-shifts .fl-viewer-compare-shift-badge {
   border-color: rgba(192, 57, 43, 0.45);
   background: rgba(192, 57, 43, 0.2);
   color: #f0c4bc;
+}
+
+.fl-viewer-fs-list.fl-viewer-compare-shifts .fl-viewer-compare-shift-badge[data-direction="firm"] {
+  border-color: rgba(120, 200, 160, 0.35);
+  background: rgba(120, 200, 160, 0.12);
+  color: #b8e8cc;
+}
+
+.fl-viewer-fs-list.fl-viewer-compare-shifts .fl-viewer-compare-shift-badge[data-direction="hedge"] {
+  border-color: rgba(230, 190, 120, 0.4);
+  background: rgba(230, 190, 120, 0.12);
+  color: #edd4a8;
+}
+
+.fl-viewer-fs-list.fl-viewer-compare-shifts .fl-viewer-compare-shift-badge[data-direction="neutral"] {
+  border-color: rgba(180, 185, 200, 0.35);
+  background: rgba(180, 185, 200, 0.1);
+  color: #c8ccd6;
+}
+
+.fl-viewer-fs-list.fl-viewer-compare-shifts .fl-viewer-compare-shift-badge[data-direction="mixed"] {
+  border-color: rgba(200, 160, 230, 0.35);
+  background: rgba(200, 160, 230, 0.1);
+  color: #dcc4f0;
 }
 
 .fl-viewer-compare-shift-text {

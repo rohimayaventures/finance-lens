@@ -13,8 +13,6 @@ type AnalyzeBody = {
   docType?: string;
   driftEnabled?: boolean;
   confidenceEnabled?: boolean;
-  /** Use a smaller, faster model and tighter token budget (good default for long pastes). */
-  fastAnalysis?: boolean;
 };
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
@@ -23,20 +21,11 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-function resolveAnalyzeModel(fast: boolean): string {
-  if (fast) {
-    return (
-      process.env.ANTHROPIC_ANALYZE_MODEL_FAST?.trim() ||
-      "claude-3-5-haiku-20241022"
-    );
-  }
+function resolveAnalyzeModel(): string {
   return process.env.ANTHROPIC_ANALYZE_MODEL?.trim() || "claude-sonnet-4-20250514";
 }
 
-function resolveMaxTokens(fast: boolean): number {
-  if (fast) {
-    return Math.min(4096, parsePositiveInt(process.env.ANTHROPIC_ANALYZE_MAX_TOKENS_FAST, 2048));
-  }
+function resolveMaxTokens(): number {
   return Math.min(8192, parsePositiveInt(process.env.ANTHROPIC_ANALYZE_MAX_TOKENS, 3072));
 }
 
@@ -94,11 +83,10 @@ export async function POST(request: NextRequest) {
     const docType = body.docType ?? "earnings";
     const driftEnabled = body.driftEnabled !== false;
     const confidenceEnabled = body.confidenceEnabled !== false;
-    const fastAnalysis = body.fastAnalysis === true;
 
     const anthropic = new Anthropic({ apiKey });
-    const model = resolveAnalyzeModel(fastAnalysis);
-    const maxTokens = resolveMaxTokens(fastAnalysis);
+    const model = resolveAnalyzeModel();
+    const maxTokens = resolveMaxTokens();
 
     const systemPrompt = [
       "You are FinanceLens AI, a financial document intelligence analyst.",
