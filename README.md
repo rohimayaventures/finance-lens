@@ -51,7 +51,7 @@ Paste a financial document and FinanceLens returns structured intelligence:
 | Framework | Next.js 16 (App Router), React 19 |
 | Language | TypeScript |
 | Styling | Tailwind CSS v4 |
-| AI | Claude Sonnet 4 (`claude-sonnet-4-20250514` for analyze/compare; override via env) |
+| AI | Claude Sonnet 4.6 (`claude-sonnet-4-6` for analyze/compare/briefing; override via env) |
 | Validation | Zod + one-shot JSON repair retry |
 | Deck file | pptxgenjs (client) |
 | PDF | pdf-lib (API route) |
@@ -87,7 +87,7 @@ UNSPLASH_ACCESS_KEY=your_unsplash_access_key
 
 Optional analysis tuning:
 
-- `ANTHROPIC_ANALYZE_MODEL` (default Sonnet 4)
+- `ANTHROPIC_MODEL` or `ANTHROPIC_ANALYZE_MODEL` (default `claude-sonnet-4-6`; retired IDs are ignored)
 - `ANTHROPIC_ANALYZE_MAX_TOKENS`
 
 The analyze route sets `maxDuration` to **120s**; **Vercel Hobby** may still cap execution time lower than that.

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
+import { resolveClaudeModel } from "@/lib/claudeModel";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
 import { analysisResultSchema } from "@/lib/schemas/analysis";
 import { getSupabase } from "@/lib/supabase";
@@ -19,10 +20,6 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback;
   const n = Number.parseInt(raw, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-function resolveAnalyzeModel(): string {
-  return process.env.ANTHROPIC_ANALYZE_MODEL?.trim() || "claude-sonnet-4-20250514";
 }
 
 function resolveMaxTokens(): number {
@@ -85,7 +82,7 @@ export async function POST(request: NextRequest) {
     const confidenceEnabled = body.confidenceEnabled !== false;
 
     const anthropic = new Anthropic({ apiKey });
-    const model = resolveAnalyzeModel();
+    const model = resolveClaudeModel();
     const maxTokens = resolveMaxTokens();
 
     const systemPrompt = [

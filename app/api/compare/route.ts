@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
+import { resolveClaudeModel } from "@/lib/claudeModel";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
 import { compareResultSchema } from "@/lib/schemas/compare";
 import { deckShareUrl } from "@/lib/publicAppUrl";
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
     const userMessage = ["DOCUMENT A:", textA, "", "DOCUMENT B:", textB].join("\n");
 
     const normalized = await claudeJsonWithRetry(anthropic, {
-      model: "claude-sonnet-4-20250514",
+      model: resolveClaudeModel(),
       maxTokens: 4096,
       system: systemPrompt,
       user: userMessage,

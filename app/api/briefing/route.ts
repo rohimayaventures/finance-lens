@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { nanoid } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
+import { resolveClaudeModel } from "@/lib/claudeModel";
 import { claudeJsonWithRetry } from "@/lib/claudeJsonWithRetry";
 import { deckShareUrl } from "@/lib/publicAppUrl";
 import { resolveBriefingImages } from "@/lib/briefingResolveSlides";
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
     ].join("\n\n");
 
     const rawOutline = await claudeJsonWithRetry(anthropic, {
-      model: "claude-sonnet-4-20250514",
+      model: resolveClaudeModel(),
       maxTokens: 4096,
       system: systemPrompt,
       user: `Build the briefing outline from this analysis:\n\n${userPayload}`,

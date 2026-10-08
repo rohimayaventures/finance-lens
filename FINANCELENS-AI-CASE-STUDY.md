@@ -176,7 +176,7 @@ The decision: convert all delta sections to an accordion layout. Claim shifts an
 
 **Six output sections (actual shipped labels):** What they said, What it actually means, Key numbers, Language drift (hedge/firm tags with quoted phrases), Worth a closer look, Source anchors. Confidence score as a separate toggleable element with a 0-100 LLM-assigned rubric on evidence density. Not a statistical prediction. Not a stock recommendation.
 
-**Speed:** Claude Sonnet 4 (`claude-sonnet-4-20250514`) for all translate and verify calls. Sonnet is used throughout rather than a smaller model because clinical and financial plain-language work requires high-quality structured output. No Haiku routing is implemented.
+**Speed:** Claude Sonnet 4.6 (`claude-sonnet-4-6`) for all translate and verify calls. Sonnet is used throughout rather than a smaller model because clinical and financial plain-language work requires high-quality structured output. No Haiku routing is implemented.
 
 **Persistence:** Results in sessionStorage for the tab session. Share analysis saves to Supabase and returns a share URL at `/deck/[slug]` with a 30-day TTL. Expiry is displayed in the viewer. Expired slugs return a 410 branded error state.
 
@@ -217,7 +217,7 @@ All analyze, compare, and briefing routes use `claudeJsonWithRetry`: one repair 
 | Component | Decision | Rationale |
 |---|---|---|
 | Framework | Next.js 16 App Router, React 19 | Current production versions at build time. |
-| AI model | claude-sonnet-4-20250514 (analyze/compare/briefing); override via `ANTHROPIC_ANALYZE_MODEL` | Sonnet throughout for structured financial plain-language output. |
+| AI model | claude-sonnet-4-6 (analyze/compare/briefing); override via `ANTHROPIC_ANALYZE_MODEL` | Sonnet throughout for structured financial plain-language output. |
 | Validation | Zod schemas + `lib/claudeJsonWithRetry.ts` | Silent failures in financial analysis are a trust problem. One repair turn on schema or JSON failure before error state surfaces. |
 | Output contract | Fixed typed JSON schema, six sections | Each section has a distinct analytical purpose. Free-form output would collapse the structure that is the product. |
 | Source anchors | Required field in Zod schema | If a claim cannot be sourced to a passage, it fails validation at the schema level. |
@@ -295,7 +295,7 @@ Financial documents are written for lawyers and analysts. Earnings calls, 10-Ks,
 
 ### Process steps
 1. **The product thesis** — Summarization is a solved problem. Intelligence is not. The brief was to build a tool that structures financial documents into distinct analytical sections with source anchors where available, Zod-validated, with language drift detection as the most analytically novel capability.
-2. **The architecture** — Claude Sonnet 4 (`claude-sonnet-4-20250514`) with a strict typed JSON output contract and `claudeJsonWithRetry` for one structured repair turn on failure. Source anchors are prompt-required and surfaced when present. The compare mode uses a diff-aware system prompt, a distinct architecture from standard analysis.
+2. **The architecture** — Claude Sonnet 4.6 (`claude-sonnet-4-6`) with a strict typed JSON output contract and `claudeJsonWithRetry` for one structured repair turn on failure. Source anchors are prompt-required and surfaced when present. The compare mode uses a diff-aware system prompt, a distinct architecture from standard analysis.
 3. **The pivots** — Five documented decisions: Canva API replaced with an owned presentation layer, multi-megabyte design exports replaced with a Sharp-optimized media pipeline, portfolio attribution wired across landing and deck viewer, share URLs implemented as 30-day Supabase-backed sessions with 410 expiry, and compare results rebuilt as an accordion layout with default-open signal sections.
 
 ### Process steps interactive (sidebar anchors)
@@ -330,7 +330,7 @@ The intelligence is in the delta. What changed from last quarter. Where manageme
 ### Honest summary
 
 **Technical understanding:**
-Claude Sonnet 4 (`claude-sonnet-4-20250514`) is used for all translate, verify, compare, and briefing calls. No Haiku routing is implemented. Source anchors are prompt-required and surfaced when the model includes them; `supportingEvidence` is optional in the Zod schema, not a hard validation gate. `claudeJsonWithRetry` fires one structured repair turn before the error state surfaces. The compare mode uses a diff-aware system prompt, architecturally distinct from standard analysis. The presentation layer is fully owned: Claude deck outline, pptxgenjs PPTX (Calibri for Office compatibility), pdf-lib PDF (WSJ Editorial typography), custom Next.js deck viewer at 30-day Supabase URLs with HTTP **404** for unknown slugs and **410** when the share has expired (middleware + branded HTML). Media pipeline: `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. The UI is mostly custom `.fl-*` CSS classes; Tailwind provides the reset and utility base.
+Claude Sonnet 4.6 (`claude-sonnet-4-6`) is used for all translate, verify, compare, and briefing calls. No Haiku routing is implemented. Source anchors are prompt-required and surfaced when the model includes them; `supportingEvidence` is optional in the Zod schema, not a hard validation gate. `claudeJsonWithRetry` fires one structured repair turn before the error state surfaces. The compare mode uses a diff-aware system prompt, architecturally distinct from standard analysis. The presentation layer is fully owned: Claude deck outline, pptxgenjs PPTX (Calibri for Office compatibility), pdf-lib PDF (WSJ Editorial typography), custom Next.js deck viewer at 30-day Supabase URLs with HTTP **404** for unknown slugs and **410** when the share has expired (middleware + branded HTML). Media pipeline: `scripts/optimize-assets.mjs` produces `hero.webp`, `og-image.jpg`, and rasterized icons. The UI is mostly custom `.fl-*` CSS classes; Tailwind provides the reset and utility base.
 
 **Product understanding:**
 The product hypothesis is that structured intelligence and summarization are different products. Every architectural decision follows from that hypothesis. The language drift section requires a system prompt specifically designed to produce hedge/firm classification. Five pivot decisions are documented in Section 3: Canva to owned layer, design exports to build pipeline, attribution as shipping criteria, share URLs as the unit of sharing, and compare accordion as information reveal design. The honest gaps: source anchors are optional in schema not required, no streaming on analyze, no rate limiting before public traffic, no observability before monetization.
